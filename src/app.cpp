@@ -174,11 +174,17 @@ int App::init() {
 
 void App::analyzeAudio(const int& channel, const float* const buffer, float* const pitch, float* const probability) {
     auto pitchList = new_fvec(1);
-    aubio_pitch_do (aubioPitchChannels[channel], buffer, pitchList);
+    fvec_t buf = {
+        ANALYSIS_BUFFER_LENGTH / 2,
+        (float*)buffer
+    };
+    aubio_pitch_do (aubioPitchChannels[channel], &buf, pitchList);
     *pitch = fvec_get_sample(pitchList, 1);
+
     del_fvec(pitchList);
-    // *pitch = yinChannels[channel].getPitch(buffer);
-    // *probability = yinChannels[channel].getProbability();
+    *pitch = yinChannels[channel].getPitch(buffer);
+    *probability = yinChannels[channel].getProbability();
+    //std::cout << *pitch << std::endl;
 }
 
 void App::initAudio() {
