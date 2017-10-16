@@ -110,7 +110,7 @@ void Yin::difference(const float* buffer) {
     float delta;
     for (tau = 0 ; tau < halfBufferSize; tau++){
         for (index = 0; index < halfBufferSize; index++){
-            delta= buffer[index] - buffer[index + tau];
+            delta = buffer[index] - buffer[index + tau];
             yinBuffer[tau] += delta * delta;
         }
     }

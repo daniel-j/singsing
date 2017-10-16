@@ -38,7 +38,7 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
         tone = (int)round(fmod(note, 12.0)) % 12;
         toneAccuracy = round(fmod(note, 12.0)) - fmod(note, 12.0);
 
-        if (probability > 0.5 && amplitude > threshold) {
+        if (false && pitch > 0.0 && probability > 0.4 && amplitude > threshold) {
           // std::cout << pitch << " " << tone << " " << toneOff << " " << tones[tone] << " " << probability << std::endl;
           std::cout << "Channel " << channel + 1 << ": " <<
                        round(100 * amplitude) << " \t" <<
@@ -53,7 +53,16 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
                   std::cout << "|";
               }
           }
-          std::cout << " " << a << std::endl;
+          std::cout << " " << a << "\t";
+          a = probability * 10;
+          for (int i = 0; i < 10; ++i) {
+              if (i >= a) {
+                  std::cout << "-";
+              } else {
+                  std::cout << "#";
+              }
+          }
+          std::cout << " " << probability * 100 << std::endl;
         }
     }
 
@@ -113,10 +122,6 @@ App::~App() {
     TTF_Quit();
     SDL_Quit();
     if (yinChannels) delete[] yinChannels;
-    if (aubioBuffers) {
-        del_fvec(aubioBuffers[0]);
-        del_fvec(aubioBuffers[1]);
-    }
     if (aubioPitchChannels) {
         del_aubio_pitch(aubioPitchChannels[0]);
         del_aubio_pitch(aubioPitchChannels[1]);
@@ -173,18 +178,20 @@ int App::init() {
 }
 
 void App::analyzeAudio(const int& channel, const float* const buffer, float* const pitch, float* const probability) {
-    auto pitchList = new_fvec(1);
+    fvec_t out = {
+        1,
+        pitch
+    };
     fvec_t buf = {
-        ANALYSIS_BUFFER_LENGTH / 2,
+        ANALYSIS_BUFFER_LENGTH,
         (float*)buffer
     };
-    aubio_pitch_do (aubioPitchChannels[channel], &buf, pitchList);
-    *pitch = fvec_get_sample(pitchList, 1);
-
-    del_fvec(pitchList);
+    aubio_pitch_do (aubioPitchChannels[channel], &buf, &out);
+    *probability = aubio_pitch_get_confidence(aubioPitchChannels[channel]);
+    std::cout << *probability << " ";
     *pitch = yinChannels[channel].getPitch(buffer);
     *probability = yinChannels[channel].getProbability();
-    //std::cout << *pitch << std::endl;
+    std::cout << *probability << std::endl;
 }
 
 void App::initAudio() {
@@ -256,7 +263,7 @@ void App::initAudio() {
     aubioPitchChannels = (aubio_pitch_t **)malloc(sizeof(aubio_pitch_t *) * inputParams.channelCount);
     for (int channel = 0; channel < inputParams.channelCount; ++channel) {
         yinChannels[channel].initialize(deviceInfo->defaultSampleRate, ANALYSIS_BUFFER_LENGTH);
-        aubioPitchChannels[channel] = new_aubio_pitch("default", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, deviceInfo->defaultSampleRate);
+        aubioPitchChannels[channel] = new_aubio_pitch("yinfft", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, deviceInfo->defaultSampleRate);
     }
     err = Pa_StartStream(stream);
     if ( err != paNoError ) {

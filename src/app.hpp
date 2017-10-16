@@ -14,7 +14,6 @@ class App {
     int initGL();
  public:
     Yin* yinChannels = nullptr;
-    fvec_t** aubioBuffers = nullptr;
     aubio_pitch_t** aubioPitchChannels = nullptr;
     App();
     ~App();
