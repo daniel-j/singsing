@@ -18,9 +18,9 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
                    PaStreamCallbackFlags statusFlags,
                    void *userData) {
     auto app = (App*)userData;
-    float threshold = 0.05f;
+    float threshold = 0.02f;
 
-    for (int channel = 0; channel < 2; ++channel) {
+    for (int channel = 0; channel < 1; ++channel) {
         float *channelBuffer = ((float **) inputBuffer)[channel];
         float amplitude = 0.0f;
         for (int i = 0; i < framesPerBuffer; ++i) {
@@ -38,12 +38,20 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
         tone = (int)round(fmod(note, 12.0)) % 12;
         toneAccuracy = round(fmod(note, 12.0)) - fmod(note, 12.0);
 
-        if (false && pitch > 0.0 && probability > 0.4 && amplitude > threshold) {
+        if (pitch > 0.0 && probability > 0.4 && amplitude > threshold) {
           // std::cout << pitch << " " << tone << " " << toneOff << " " << tones[tone] << " " << probability << std::endl;
           std::cout << "Channel " << channel + 1 << ": " <<
-                       round(100 * amplitude) << " \t" <<
-                       tones[tone] << " \t";
-          int a = -toneAccuracy * 10;
+                       round(100 * amplitude) << "\t" <<
+                       tones[tone] << "\t";
+          for (int i = 0; i < 12; ++i) {
+              if (i != tone) {
+                  std::cout << "-";
+              } else {
+                  std::cout << "#";
+              }
+          }
+          std::cout << "\t";
+          int a = round(-toneAccuracy * 10.0);
           for (int i = -5; i < 5; ++i) {
               if (i != a) {
                   std::cout << "-";
@@ -53,8 +61,8 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
                   std::cout << "|";
               }
           }
-          std::cout << " " << a << "\t";
-          a = probability * 10;
+          std::cout << " " << -toneAccuracy << "\t";
+          a = ceil(probability * 10.0);
           for (int i = 0; i < 10; ++i) {
               if (i >= a) {
                   std::cout << "-";
@@ -121,12 +129,12 @@ App::~App() {
     if (mainWindow) SDL_DestroyWindow(mainWindow);
     TTF_Quit();
     SDL_Quit();
+    Pa_Terminate();
     if (yinChannels) delete[] yinChannels;
     if (aubioPitchChannels) {
         del_aubio_pitch(aubioPitchChannels[0]);
         del_aubio_pitch(aubioPitchChannels[1]);
     }
-    Pa_Terminate();
 }
 int App::init() {
 
@@ -188,10 +196,12 @@ void App::analyzeAudio(const int& channel, const float* const buffer, float* con
     };
     aubio_pitch_do (aubioPitchChannels[channel], &buf, &out);
     *probability = aubio_pitch_get_confidence(aubioPitchChannels[channel]);
-    std::cout << *probability << " ";
+
+    // std::cout << "A: " << *pitch << " " << *probability << std::endl;
+
     *pitch = yinChannels[channel].getPitch(buffer);
     *probability = yinChannels[channel].getProbability();
-    std::cout << *probability << std::endl;
+    // std::cout << "B: " << *pitch << " " << *probability << std::endl;
 }
 
 void App::initAudio() {
@@ -262,8 +272,8 @@ void App::initAudio() {
     yinChannels = new Yin[inputParams.channelCount];
     aubioPitchChannels = (aubio_pitch_t **)malloc(sizeof(aubio_pitch_t *) * inputParams.channelCount);
     for (int channel = 0; channel < inputParams.channelCount; ++channel) {
-        yinChannels[channel].initialize(deviceInfo->defaultSampleRate, ANALYSIS_BUFFER_LENGTH);
-        aubioPitchChannels[channel] = new_aubio_pitch("yinfft", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, deviceInfo->defaultSampleRate);
+        yinChannels[channel].initialize(deviceInfo->defaultSampleRate, ANALYSIS_BUFFER_LENGTH, 0.9);
+        aubioPitchChannels[channel] = new_aubio_pitch("yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, deviceInfo->defaultSampleRate);
     }
     err = Pa_StartStream(stream);
     if ( err != paNoError ) {

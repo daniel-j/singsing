@@ -1,7 +1,5 @@
 #pragma once
 
-// Based on https://github.com/JorenSix/Pidato/blob/master/libraries/Yin/Yin.h
-
 class Yin {
 private:
     double threshold;
@@ -15,14 +13,13 @@ public:
     Yin(float sampleRate, int bufferSize);
     ~Yin();
 
-    void initialize(float sampleRate, int bufferSize);
+    void initialize(float sampleRate, int bufferSize, float yinThreshold = 0.15);
     float getPitch(const float *buffer);
     float getProbability();
 
 private:
-    float parabolicInterpolation(int tauEstimate);
-    int absoluteThreshold();
-    void cumulativeMeanNormalizedDifference();
     void difference(const float *buffer);
+    void cumulativeMeanNormalizedDifference();
+    int absoluteThreshold();
+    float parabolicInterpolation(int tauEstimate);
 };
-
