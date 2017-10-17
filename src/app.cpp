@@ -7,8 +7,11 @@
 #include "shader.hpp"
 #include <glm/glm.hpp>
 #include <SDL2/SDL_ttf.h>
+#include "base/ringbuffer.hpp"
 
 const int ANALYSIS_BUFFER_LENGTH = 2048;
+
+RingBuffer<float> ring(ANALYSIS_BUFFER_LENGTH);
 
 std::string tones[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -41,7 +44,7 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
         if (pitch > 0.0 && probability > 0.4 && amplitude > threshold) {
           // std::cout << pitch << " " << tone << " " << toneOff << " " << tones[tone] << " " << probability << std::endl;
           std::cout << "Channel " << channel + 1 << ": " <<
-                       round(100 * amplitude) << "\t" <<
+                       round(pitch) << "\t" <<
                        tones[tone] << "\t";
           for (int i = 0; i < 12; ++i) {
               if (i != tone) {
@@ -273,7 +276,7 @@ void App::initAudio() {
     aubioPitchChannels = (aubio_pitch_t **)malloc(sizeof(aubio_pitch_t *) * inputParams.channelCount);
     for (int channel = 0; channel < inputParams.channelCount; ++channel) {
         yinChannels[channel].initialize(deviceInfo->defaultSampleRate, ANALYSIS_BUFFER_LENGTH, 0.9);
-        aubioPitchChannels[channel] = new_aubio_pitch("yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, deviceInfo->defaultSampleRate);
+        aubioPitchChannels[channel] = new_aubio_pitch((char*)"yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, deviceInfo->defaultSampleRate);
     }
     err = Pa_StartStream(stream);
     if ( err != paNoError ) {
@@ -333,7 +336,7 @@ int App::launch() {
 
     GLuint fpsTexture;
     glGenTextures( 1, &fpsTexture );
-    TextToTexture(fpsTexture, gFont, 255, 0, 255, "Hello, World!");
+    TextToTexture(fpsTexture, gFont, 50, 0, 50, "Hello, World!");
 
     bool isrunning = true;
     while (isrunning) {

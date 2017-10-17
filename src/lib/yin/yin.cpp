@@ -27,7 +27,7 @@ float Yin::getProbability() {
     return probability;
 }
 
-float Yin::getPitch(const float* buffer) {
+float Yin::getPitch(const float *buffer) {
     int tauEstimate = -1;
     float pitchInHertz = -1;
 
@@ -53,7 +53,7 @@ float Yin::getPitch(const float* buffer) {
  * This is the Yin algorithms tweak on autocorellation. Read http://audition.ens.fr/adc/pdf/2002_JASA_YIN.pdf
  * for more details on what is in here and why it's done this way.
  */
-void Yin::difference(const float* buffer) {
+void Yin::difference(const float *buffer) {
     int index, tau;
     float delta;
 

@@ -14,6 +14,7 @@ public:
     ~Yin();
 
     void initialize(float sampleRate, int bufferSize, float yinThreshold = 0.15);
+
     float getPitch(const float *buffer);
     float getProbability();
 
