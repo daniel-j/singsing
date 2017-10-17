@@ -14,12 +14,11 @@ public:
     ~Yin();
 
     void initialize(float sampleRate, int bufferSize, float yinThreshold = 0.15);
-
-    float getPitch(const float *buffer);
+    float getPitch(const float *buffer, const unsigned int start = 0);
     float getProbability();
 
 private:
-    void difference(const float *buffer);
+    void difference(const float *buffer, const unsigned int start = 0);
     void cumulativeMeanNormalizedDifference();
     int absoluteThreshold();
     float parabolicInterpolation(int tauEstimate);

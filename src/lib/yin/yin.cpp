@@ -27,12 +27,12 @@ float Yin::getProbability() {
     return probability;
 }
 
-float Yin::getPitch(const float *buffer) {
+float Yin::getPitch(const float *buffer, const unsigned int start) {
     int tauEstimate = -1;
     float pitchInHertz = -1;
 
     /* Step 2: Calculates the squared difference of the signal with a shifted version of itself. */
-    difference(buffer);
+    difference(buffer, start);
 
     /* Step 3: Calculate the cumulative mean on the normalised difference calculated in step 1 */
     cumulativeMeanNormalizedDifference();
@@ -53,7 +53,7 @@ float Yin::getPitch(const float *buffer) {
  * This is the Yin algorithms tweak on autocorellation. Read http://audition.ens.fr/adc/pdf/2002_JASA_YIN.pdf
  * for more details on what is in here and why it's done this way.
  */
-void Yin::difference(const float *buffer) {
+void Yin::difference(const float *buffer, const unsigned int start) {
     int index, tau;
     float delta;
 
@@ -63,7 +63,7 @@ void Yin::difference(const float *buffer) {
         /* Take the difference of the signal with a shifted version of itself, then square it.
          * (This is the Yin algorithm's tweak on autocorellation) */
         for (index = 0; index < halfBufferSize; index++) {
-            delta = buffer[index] - buffer[index + tau];
+            delta = buffer[(start + index) % bufferSize] - buffer[(start + index + tau) % bufferSize];
             yinBuffer[tau] += delta * delta;
         }
     }

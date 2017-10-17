@@ -24,6 +24,7 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glm REQUIRED)
 find_package(SDL2 REQUIRED)
+find_package(SDL2_image REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 find_package(PortAudio REQUIRED)
 find_package(aubio REQUIRED)
@@ -34,6 +35,7 @@ target_link_libraries(
     ${GLEW_LIBRARIES}
     ${GLM_LIBRARIES}
     ${SDL2_LIBRARY}
+    ${SDL2_IMAGE_LIBRARIES}
     ${SDL2_TTF_LIBRARIES}
     ${AUBIO_LIBRARIES}
     ${PORTAUDIO_LIBRARIES}

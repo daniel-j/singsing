@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <mutex>
+#include <iostream>
 
 template <class T>
 class RingBuffer {
@@ -22,13 +23,13 @@ public:
 
         buf_[head_] = item;
         head_ = (head_ + 1) % size_;
-        if (length_ < size_ - 1) {
-            ++length_;
-        }
+        ++length_;
 
         if (head_ == tail_) {
             tail_ = (tail_ + 1) % size_;
         }
+
+        // std::cout << "put " << head_ << "\t" << tail_ << "\t" << length_ << std::endl;
     }
 
     T get() {
@@ -38,18 +39,15 @@ public:
             return T();
         }
 
-
         --length_;
 
         // read data and advance the tail (we now have a free space)
         auto val = buf_[tail_];
         tail_ = (tail_ + 1) % size_;
 
-        return val;
-    }
+        // std::cout << "get " << head_ << "\t" << tail_ << "\t" << length_ << std::endl;
 
-    T operator[](size_t index) {
-        return buf_[(head_ + index) % size_];
+        return val;
     }
 
     void reset() {
@@ -58,17 +56,31 @@ public:
         length_ = 0;
     }
 
-    bool empty() {
+    T* buffer() const {
+        // std::cout << "buf " << head_ << "\t" << tail_ << "\t" << length_ << std::endl;
+        return buf_.get();
+    }
+
+    bool empty() const {
         // if head and tail are equal, we are empty
         return head_ == tail_;
     }
 
-    bool full() {
+    bool full() const {
         // if tail is ahead the head by 1, we are full
         return ((head_ + 1) % size_) == tail_;
     }
 
-    size_t size() {
+    size_t size() const {
         return size_ - 1;
+    }
+    size_t head() const {
+        return head_;
+    }
+    size_t tail() const {
+        return tail_;
+    }
+    size_t length() const {
+        return length_;
     }
 };
