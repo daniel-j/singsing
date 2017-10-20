@@ -3,7 +3,7 @@
 #include <GL/glew.h>
 #include "app.hpp"
 #include <iostream>
-#include <portaudio.h>
+// #include <portaudio.h>
 #include "shader.hpp"
 #include <glm/glm.hpp>
 #include <SDL2/SDL_image.h>
@@ -20,7 +20,7 @@ float currentConfidence = 0.0;
 std::mutex audioMutex;
 
 std::string tones[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-
+/*
 int recordCallback(const void *inputBuffer, void *outputBuffer,
                    unsigned long framesPerBuffer,
                    const PaStreamCallbackTimeInfo* timeInfo,
@@ -141,7 +141,7 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
 
     return paContinue;
 }
-
+*/
 void App::analyzeAudio(const int& channel, const float* const buffer, float* const pitch, float* const probability) {
     /*fvec_t out = {
         1,
@@ -175,7 +175,7 @@ App::~App() {
     if (mainWindow) SDL_DestroyWindow(mainWindow);
     TTF_Quit();
     SDL_Quit();
-    Pa_Terminate();
+    // Pa_Terminate();
     if (yinChannels) delete[] yinChannels;
     if (aubioPitchChannels) {
         del_aubio_pitch(aubioPitchChannels[0]);
@@ -185,12 +185,12 @@ App::~App() {
 
 int App::init() {
 
-    initAudio();
-
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
     }
+
+    initAudio();
 
     if (TTF_Init() == -1) {
         std::cerr << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
@@ -242,6 +242,52 @@ int App::init() {
 
 void App::initAudio() {
 
+#if SDL_AUDIO_DRIVER_ALSAA
+    if (SDL_AudioInit("alsa")) {
+        std::cerr << "Failed to initialize ALSA" << std::endl;
+        SDL_AudioInit(NULL);
+    }
+#endif
+
+    const char* driver_name = SDL_GetCurrentAudioDriver();
+
+    if (driver_name) {
+        printf("Audio subsystem initialized; driver = %s.\n", driver_name);
+    } else {
+        printf("Audio subsystem not initialized.\n");
+    }
+
+    /*for (int i = 0; i < SDL_GetNumAudioDrivers(); ++i) {
+        printf("Audio driver %d: %s\n", i, SDL_GetAudioDriver(i));
+    }*/
+
+    int i, count = SDL_GetNumAudioDevices(1);
+    std::cout << "Number of devices: " << count << std::endl;
+    for (i = 0; i < count; ++i) {
+        printf("Audio device %d: %s\n", i, SDL_GetAudioDeviceName(i, 1));
+    }
+
+    SDL_AudioSpec want, have;
+    SDL_zero(want);
+    want.freq = 44100;
+    want.format = AUDIO_F32;
+    want.channels = 2;
+    want.samples = 256;
+    want.callback = NULL;
+
+    auto dev = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, 1), 0, &want, &have, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    if (dev == 0) {
+        SDL_Log("Failed to open audio: %s", SDL_GetError());
+    } else {
+        if (have.format != want.format) { /* we let this one thing change. */
+            SDL_Log("We didn't get Float32 audio format.");
+        }
+        SDL_PauseAudioDevice(dev, 0); /* start audio playing. */
+        // SDL_Delay(5000); /* let the audio callback play some sound for 5 seconds. */
+        SDL_CloseAudioDevice(dev);
+    }
+
+    /*
     PaError err = paNoError;
     PaStreamParameters inputParameters, outputParameters;
     err = Pa_Initialize();
@@ -315,6 +361,7 @@ void App::initAudio() {
     if ( err != paNoError ) {
         std::cerr << "Unable to start input stream" << std::endl;
     }
+    */
 }
 
 SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, uint8_t r, uint8_t g, uint8_t b, const char* text ) {
