@@ -4,6 +4,7 @@
 #include "app.hpp"
 #include <iostream>
 // #include <portaudio.h>
+#include <soundio/soundio.h>
 #include "shader.hpp"
 #include <glm/glm.hpp>
 #include <SDL2/SDL_image.h>
@@ -11,13 +12,18 @@
 #include "base/ringbuffer.hpp"
 #include "util/fpscounter.hpp"
 
-const int ANALYSIS_BUFFER_LENGTH = 2048;
+const int ANALYSIS_BUFFER_LENGTH = 4096;
 
-RingBuffer<float> ring(ANALYSIS_BUFFER_LENGTH);
+RingBuffer<float> ring(ANALYSIS_BUFFER_LENGTH + 1);
 float currentNote = 0.0;
 float currentNote2 = 0.0;
 float currentConfidence = 0.0;
+float currentConfidence2 = 0.0;
 std::mutex audioMutex;
+
+struct SoundIo *soundio;
+struct SoundIoDevice *in_device;
+struct SoundIoInStream *instream;
 
 std::string tones[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 /*
@@ -142,28 +148,24 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
     return paContinue;
 }
 */
-void App::analyzeAudio(const int& channel, const float* const buffer, float* const pitch, float* const probability) {
-    /*fvec_t out = {
-        1,
-        pitch
-    };
-    fvec_t buf = {
-        ANALYSIS_BUFFER_LENGTH,
-        (float*)buffer
-    };*/
-    //aubio_pitch_do (aubioPitchChannels[channel], &buf, &out);
-    //*probability = aubio_pitch_get_confidence(aubioPitchChannels[channel]);
-
-    // std::cout << "A: " << *pitch << " " << *probability << std::endl;
-
-
-    *pitch = yinChannels[channel].getPitch(buffer, 0);
-    *probability = yinChannels[channel].getProbability();
-
-    for (int i = 0; i < ANALYSIS_BUFFER_LENGTH; ++i) {
-        ring.get();
+void App::analyzeAudio(const int& channel, const float* const buffer, float* const pitch, float* const probability, const bool useAubio) {
+    if (useAubio) {
+        fvec_t out = {
+            1,
+            pitch
+        };
+        fvec_t buf = {
+            ANALYSIS_BUFFER_LENGTH,
+            (float*)buffer
+        };
+        aubio_pitch_do (aubioPitchChannels[channel], &buf, &out);
+        *probability = aubio_pitch_get_confidence(aubioPitchChannels[channel]);
+        //std::cout << "A: " << *pitch << " " << *probability << std::endl;
+    } else {
+        *pitch = yinChannels[channel].getPitch(buffer, 0);
+        *probability = yinChannels[channel].getProbability();
+        //std::cout << "B: " << *pitch << " " << *probability << std::endl;
     }
-    // std::cout << "B: " << *pitch << " " << *probability << std::endl;
 }
 
 App::App() {
@@ -176,6 +178,9 @@ App::~App() {
     TTF_Quit();
     SDL_Quit();
     // Pa_Terminate();
+    soundio_instream_destroy(instream);
+    soundio_device_unref(in_device);
+    soundio_destroy(soundio);
     if (yinChannels) delete[] yinChannels;
     if (aubioPitchChannels) {
         del_aubio_pitch(aubioPitchChannels[0]);
@@ -240,7 +245,146 @@ int App::init() {
     return 0;
 }
 
+void read_callback(struct SoundIoInStream *instream, int frame_count_min, int frame_count_max) {
+    auto app = (App*)instream->userdata;
+    struct SoundIoChannelArea *areas;
+
+    float amplitude = 0.0f;
+    int frames_left = frame_count_max;
+
+    for (;;) {
+        int frame_count = frames_left;
+        int err;
+
+        if ((err = soundio_instream_begin_read(instream, &areas, &frame_count))) {
+            fprintf(stderr, "begin read error: %s", soundio_strerror(err));
+            return;
+        }
+
+        // printf("%d %d %d \n", frame_count, frame_count_min, frame_count_max);
+
+        if (!frame_count) {
+            break;
+        }
+
+        if (!areas) {
+            fprintf(stderr, "Dropped %d frames due to internal overflow\n", frame_count);
+        } else {
+            for (int frame = 0; frame < frame_count; frame += 1) {
+                float* ptr = (float*)areas[0].ptr;
+                //printf("%f\n", *(float*)areas[0].ptr);
+                ring.put(*ptr);
+                float volume = abs(*ptr);
+                if (volume > amplitude) {
+                    amplitude = volume;
+                }
+                areas[0].ptr += areas[0].step;
+            }
+        }
+
+        if ((err = soundio_instream_end_read(instream))) {
+            fprintf(stderr, "end read error: %s", soundio_strerror(err));
+            return;
+        }
+
+        float pitch, probability, note, toneAccuracy;
+        float pitch2, probability2, note2;
+        int tone;
+        float threshold = 0.05f;
+
+        if (ring.length() >= ANALYSIS_BUFFER_LENGTH) {
+            app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
+            app->analyzeAudio(0, ring.buffer(), &pitch2, &probability2, true);
+
+            for (int i = 0; i < ANALYSIS_BUFFER_LENGTH; ++i) {
+                ring.get();
+            }
+
+            static auto LOG2 = log(2.0);
+            note = 12.0 * (log(pitch / 440.0) / LOG2) + 69.0;
+            currentNote = fmod(note, 12.0);
+            currentConfidence = probability;
+
+            note2 = 12.0 * (log(pitch2 / 440.0) / LOG2) + 69.0;
+            currentNote2 = fmod(note2, 12.0);
+            currentConfidence2 = probability2;
+
+            if (pitch > 0.0 && probability > 0.1 && amplitude >= threshold) {
+
+                tone = (int)round(fmod(note, 12.0)) % 12;
+                toneAccuracy = round(fmod(note, 12.0)) - fmod(note, 12.0);
+
+                //std::cout << pitch << " " << tone << " " << tones[tone] << " " << probability << std::endl;
+
+            } else {
+                //printf("%f\n", amplitude);
+            }
+
+            fflush(stdout);
+        }
+        frames_left -= frame_count;
+        if (frames_left <= 0) {
+            break;
+        }
+    }
+}
+
+void overflow_callback(struct SoundIoInStream *instream) {
+    static int count = 0;
+    fprintf(stderr, "overflow %d\n", ++count);
+}
+
 void App::initAudio() {
+
+    // soundio
+    soundio = soundio_create();
+    soundio->app_name = "singsing";
+    int err = soundio_connect(soundio);
+    if (err) {
+        fprintf(stderr, "could not connect: %s\n", soundio_strerror(err));
+        return;
+    }
+    soundio_flush_events(soundio);
+
+    int input_count = soundio_input_device_count(soundio);
+    int default_input = soundio_default_input_device_index(soundio);
+
+    printf("Input devices: %d\n", input_count);
+
+    in_device = soundio_get_input_device(soundio, default_input);
+
+    printf("Input device: %s\n", in_device->name);
+
+    soundio_device_sort_channel_layouts(in_device);
+
+    instream = soundio_instream_create(in_device);
+
+    instream->name = "Input";
+    instream->sample_rate = 48000;
+    instream->format = SoundIoFormatFloat32NE;
+    instream->read_callback = read_callback;
+    instream->overflow_callback = overflow_callback;
+    instream->userdata = this;
+
+    if ((err = soundio_instream_open(instream))) {
+        fprintf(stderr, "unable to open input stream: %s", soundio_strerror(err));
+    }
+
+    aubioPitchChannels = (aubio_pitch_t **)malloc(sizeof(aubio_pitch_t *) * instream->layout.channel_count);
+    yinChannels = new Yin[instream->layout.channel_count];
+    for (int channel = 0; channel < instream->layout.channel_count; ++channel) {
+        aubioPitchChannels[channel] = new_aubio_pitch((char*)"yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, instream->sample_rate);
+        yinChannels[channel].initialize(instream->sample_rate, ANALYSIS_BUFFER_LENGTH, 1.0);
+    }
+
+    if ((err = soundio_instream_start(instream))) {
+        fprintf(stderr, "unable to start input device: %s\n", soundio_strerror(err));
+    }
+
+    fprintf(stderr, "%s %d Hz %s interleaved\n",
+                instream->layout.name, instream->sample_rate, soundio_format_string(instream->format));
+
+    return;
 
 #if SDL_AUDIO_DRIVER_ALSAA
     if (SDL_AudioInit("alsa")) {
@@ -426,10 +570,23 @@ int App::launch() {
     GLuint vertexbuffer;
     // Generate 1 buffer, put the resulting identifier in vertexbuffer
     glGenBuffers(1, &vertexbuffer);
-    // The following commands will talk about our 'vertexbuffer' buffer
-    // glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-    // Give our vertices to OpenGL.
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+    glVertexAttribPointer(
+        square.attribute("position"),
+        2,                  // size
+        GL_FLOAT,           // type
+        GL_FALSE,           // normalized?
+        4 * sizeof(GLfloat),// stride
+        0                   // array buffer offset
+    );
+    glVertexAttribPointer(
+        square.attribute("texcoord"),
+        2,                  // size
+        GL_FLOAT,           // type
+        GL_FALSE,           // normalized?
+        4 * sizeof(GLfloat),// stride
+        (GLvoid*)(2 * sizeof(GLfloat)) // array buffer offset
+    );
 
     auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 48);
 
@@ -452,7 +609,7 @@ int App::launch() {
         SDL_GetWindowSize(mainWindow, &winWidth, &winHeight);
         glViewport(0, 0, winWidth, winHeight);
 
-        auto textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string(framespersecond)).c_str());
+        auto textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond)).c_str());
         g_vertex_buffer_data[0+0*4] = 0.0f;
         g_vertex_buffer_data[1+0*4] = 0.0f;
         g_vertex_buffer_data[0+1*4] = 0.0f;
@@ -476,34 +633,23 @@ int App::launch() {
         square.use();
 
         glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-        glVertexAttribPointer(
-            square.attribute("position"),
-            2,                  // size
-            GL_FLOAT,           // type
-            GL_FALSE,           // normalized?
-            4 * sizeof(GLfloat),// stride
-            0                   // array buffer offset
-        );
-        glVertexAttribPointer(
-            square.attribute("texcoord"),
-            2,                  // size
-            GL_FLOAT,           // type
-            GL_FALSE,           // normalized?
-            4 * sizeof(GLfloat),// stride
-            (GLvoid*)(2 * sizeof(GLfloat)) // array buffer offset
-        );
+
         glEnableVertexAttribArray(square.attribute("position"));
         glEnableVertexAttribArray(square.attribute("texcoord"));
         glUniform2f(square.uniform("viewportSize"), winWidth, winHeight);
-        glUniform2f(square.uniform("viewOffset"), 0, currentNote * 20);
-        glUniform4f(square.uniform("bgColor"), 1.0, 0.0, 1.0, currentConfidence);
-        glUniform1f(square.uniform("textureOpacity"), 0.0);
+        glUniform2f(square.uniform("viewOffset"), 0, 0);
+        glUniform4f(square.uniform("bgColor"), 1.0, 0.0, 1.0, 0.0);
+        glUniform1f(square.uniform("textureOpacity"), 1.0);
         glBindTexture(GL_TEXTURE_2D, fpsTexture);
 
         glDrawArrays(GL_TRIANGLES, 0, 3*2);
 
-        glUniform4f(square.uniform("bgColor"), 1.0, 0.0, 0.0, 0.5);
-        glUniform2f(square.uniform("viewOffset"), 250, currentNote2 * 20);
+        glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence);
+        glUniform2f(square.uniform("viewOffset"), 300, winHeight - currentNote * 40 + 50);
+        glUniform1f(square.uniform("textureOpacity"), 0.0);
+        glDrawArrays(GL_TRIANGLES, 0, 3*2);
+        glUniform4f(square.uniform("bgColor"), 1.0, 0.2, 0.0, currentConfidence2);
+        glUniform2f(square.uniform("viewOffset"), 450, winHeight - currentNote2 * 40 + 50);
         glDrawArrays(GL_TRIANGLES, 0, 3*2);
         glDisableVertexAttribArray(square.attribute("position"));
         glDisableVertexAttribArray(square.attribute("texcoord"));
