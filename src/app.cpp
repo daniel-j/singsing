@@ -202,7 +202,7 @@ int App::init() {
         return 1;
     }
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
@@ -588,7 +588,13 @@ int App::launch() {
         (GLvoid*)(2 * sizeof(GLfloat)) // array buffer offset
     );
 
+#ifdef __linux__
     auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 48);
+#elif __APPLE__
+    auto gFont = TTF_OpenFont("/Library/Fonts/Arial.ttf", 48);
+#elif _WIN32
+    auto gFont = TTF_OpenFont("C:\\Windows\\Fonts\\arial.ttf", 48);
+#endif
 
     GLuint fpsTexture;
     glGenTextures( 1, &fpsTexture );
