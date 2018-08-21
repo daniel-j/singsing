@@ -13,7 +13,7 @@
 #include "base/ringbuffer.hpp"
 #include "util/fpscounter.hpp"
 
-const int ANALYSIS_BUFFER_LENGTH = 4096;
+const int ANALYSIS_BUFFER_LENGTH = 2048;
 
 RingBuffer<float> ring(ANALYSIS_BUFFER_LENGTH + 1);
 float currentNote = 0.0;
@@ -294,7 +294,7 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
         float threshold = 0.05f;
 
         if (ring.length() >= ANALYSIS_BUFFER_LENGTH) {
-            app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
+            // app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
             app->analyzeAudio(0, ring.buffer(), &pitch2, &probability2, true);
 
             for (int i = 0; i < ANALYSIS_BUFFER_LENGTH; ++i) {
@@ -321,7 +321,7 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
                 //printf("%f\n", amplitude);
             }
 
-            fflush(stdout);
+            //fflush(stdout);
         }
         frames_left -= frame_count;
         if (frames_left <= 0) {
@@ -366,6 +366,7 @@ void App::initAudio() {
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
     instream->userdata = this;
+    instream->software_latency = 0.05;
 
     if ((err = soundio_instream_open(instream))) {
         fprintf(stderr, "unable to open input stream: %s", soundio_strerror(err));
@@ -661,11 +662,19 @@ int App::launch() {
 
 #ifdef __linux__
     auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 48);
+    if (!gFont) {
+        gFont = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48);
+    }
 #elif __APPLE__
     auto gFont = TTF_OpenFont("/Library/Fonts/Arial.ttf", 48);
 #elif _WIN32
     auto gFont = TTF_OpenFont("C:\\Windows\\Fonts\\arial.ttf", 48);
 #endif
+
+    if (!gFont) {
+        std::cerr << "Font not found" << std::endl;
+        return 1;
+    }
 
     GLuint fpsTexture;
     glGenTextures( 1, &fpsTexture );
@@ -732,6 +741,7 @@ int App::launch() {
         glDisableVertexAttribArray(square.attribute("texcoord"));
 
         SDL_GL_SwapWindow(mainWindow);
+        SDL_Delay(1);
     }
 
     TTF_CloseFont(gFont);
