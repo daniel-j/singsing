@@ -13,7 +13,7 @@
 #include "base/ringbuffer.hpp"
 #include "util/fpscounter.hpp"
 
-const int ANALYSIS_BUFFER_LENGTH = 2048;
+const int ANALYSIS_BUFFER_LENGTH = 4096;
 
 RingBuffer<float> ring(ANALYSIS_BUFFER_LENGTH + 1);
 float currentNote = 0.0;
@@ -246,6 +246,44 @@ int App::init() {
     return 0;
 }
 
+void checkRingbuffer(App* app) {
+    float pitch, probability, note, toneAccuracy;
+    float pitch2, probability2, note2;
+    int tone;
+    float threshold = 0.03f;
+
+    // std::cout << ring.length() << std::endl;
+
+    // app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
+    app->analyzeAudio(0, ring.buffer(), &pitch2, &probability2, true);
+
+    for (int i = 0; i < ANALYSIS_BUFFER_LENGTH / 4; ++i) {
+        ring.get();
+    }
+
+    static auto LOG2 = log(2.0);
+    note = 12.0 * (log(pitch / 440.0) / LOG2) + 69.0;
+    currentNote = fmod(note, 12.0);
+    currentConfidence = probability;
+
+    note2 = 12.0 * (log(pitch2 / 440.0) / LOG2) + 69.0;
+    currentNote2 = fmod(note2, 12.0);
+    currentConfidence2 = probability2;
+
+    if (pitch > 0.0 && probability > 0.1/* && amplitude >= threshold*/) {
+
+        tone = (int)round(fmod(note, 12.0)) % 12;
+        toneAccuracy = round(fmod(note, 12.0)) - fmod(note, 12.0);
+
+        //std::cout << pitch << " " << tone << " " << tones[tone] << " " << probability << std::endl;
+
+    } else {
+        //printf("%f\n", amplitude);
+    }
+
+    //fflush(stdout);
+}
+
 void read_callback(struct SoundIoInStream *instream, int frame_count_min, int frame_count_max) {
     auto app = (App*)instream->userdata;
     struct SoundIoChannelArea *areas;
@@ -280,6 +318,9 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
                     amplitude = volume;
                 }
                 areas[0].ptr += areas[0].step;
+                if (ring.length() >= ANALYSIS_BUFFER_LENGTH) {
+                    checkRingbuffer(app);
+                }
             }
         }
 
@@ -288,41 +329,7 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
             return;
         }
 
-        float pitch, probability, note, toneAccuracy;
-        float pitch2, probability2, note2;
-        int tone;
-        float threshold = 0.05f;
-
-        if (ring.length() >= ANALYSIS_BUFFER_LENGTH) {
-            // app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
-            app->analyzeAudio(0, ring.buffer(), &pitch2, &probability2, true);
-
-            for (int i = 0; i < ANALYSIS_BUFFER_LENGTH; ++i) {
-                ring.get();
-            }
-
-            static auto LOG2 = log(2.0);
-            note = 12.0 * (log(pitch / 440.0) / LOG2) + 69.0;
-            currentNote = fmod(note, 12.0);
-            currentConfidence = probability;
-
-            note2 = 12.0 * (log(pitch2 / 440.0) / LOG2) + 69.0;
-            currentNote2 = fmod(note2, 12.0);
-            currentConfidence2 = probability2;
-
-            if (pitch > 0.0 && probability > 0.1 && amplitude >= threshold) {
-
-                tone = (int)round(fmod(note, 12.0)) % 12;
-                toneAccuracy = round(fmod(note, 12.0)) - fmod(note, 12.0);
-
-                //std::cout << pitch << " " << tone << " " << tones[tone] << " " << probability << std::endl;
-
-            } else {
-                //printf("%f\n", amplitude);
-            }
-
-            //fflush(stdout);
-        }
+        
         frames_left -= frame_count;
         if (frames_left <= 0) {
             break;
@@ -366,7 +373,9 @@ void App::initAudio() {
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
     instream->userdata = this;
-    instream->software_latency = 0.05;
+    instream->software_latency = 0.025; // 25 ms
+
+    std::cout << "Software latency: " << instream->software_latency << std::endl;
 
     if ((err = soundio_instream_open(instream))) {
         fprintf(stderr, "unable to open input stream: %s", soundio_strerror(err));
