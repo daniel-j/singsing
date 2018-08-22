@@ -252,12 +252,10 @@ void checkRingbuffer(App* app) {
     int tone;
     float threshold = 0.03f;
 
-    // std::cout << ring.length() << std::endl;
-
     // app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
     app->analyzeAudio(0, ring.buffer(), &pitch2, &probability2, true);
 
-    for (int i = 0; i < ANALYSIS_BUFFER_LENGTH / 4; ++i) {
+    for (int i = 0; i < ANALYSIS_BUFFER_LENGTH / 2; ++i) {
         ring.get();
     }
 
