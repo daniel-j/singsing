@@ -151,12 +151,13 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
 */
 void App::analyzeAudio(const int& channel, const float* const buffer, float* const pitch, float* const probability, const bool useAubio) {
     if (useAubio) {
+        uint_t len = ring.length();
         fvec_t out = {
             1,
             pitch
         };
         fvec_t buf = {
-            ANALYSIS_BUFFER_LENGTH,
+            len,
             (float*)buffer
         };
         aubio_pitch_do (aubioPitchChannels[channel], &buf, &out);
@@ -246,29 +247,27 @@ int App::init() {
     return 0;
 }
 
-void checkRingbuffer(App* app) {
+void checkRingbuffer(App* app, float amplitude) {
     float pitch, probability, note, toneAccuracy;
-    float pitch2, probability2, note2;
+    // float pitch2, probability2, note2;
     int tone;
-    float threshold = 0.03f;
+    float threshold = 0.01f;
 
     // app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
-    app->analyzeAudio(0, ring.buffer(), &pitch2, &probability2, true);
+    app->analyzeAudio(0, ring.buffer(), &pitch, &probability, true);
+    std::cout << ring.length() << std::endl;
 
-    for (int i = 0; i < ANALYSIS_BUFFER_LENGTH / 2; ++i) {
+    for (int i = 0; i < ANALYSIS_BUFFER_LENGTH / 1; ++i) {
         ring.get();
     }
 
     static auto LOG2 = log(2.0);
     note = 12.0 * (log(pitch / 440.0) / LOG2) + 69.0;
-    currentNote = fmod(note, 12.0);
-    currentConfidence = probability;
 
-    note2 = 12.0 * (log(pitch2 / 440.0) / LOG2) + 69.0;
-    currentNote2 = fmod(note2, 12.0);
-    currentConfidence2 = probability2;
+    if (pitch > 0.0 && probability > 0.1 && amplitude >= threshold) {
 
-    if (pitch > 0.0 && probability > 0.1/* && amplitude >= threshold*/) {
+        currentNote = note;
+        currentConfidence = 1; //probability;
 
         tone = (int)round(fmod(note, 12.0)) % 12;
         toneAccuracy = round(fmod(note, 12.0)) - fmod(note, 12.0);
@@ -277,6 +276,7 @@ void checkRingbuffer(App* app) {
 
     } else {
         //printf("%f\n", amplitude);
+        currentConfidence = 0;
     }
 
     //fflush(stdout);
@@ -317,7 +317,7 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
                 }
                 areas[0].ptr += areas[0].step;
                 if (ring.length() >= ANALYSIS_BUFFER_LENGTH) {
-                    checkRingbuffer(app);
+                    checkRingbuffer(app, amplitude);
                 }
             }
         }
@@ -327,7 +327,7 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
             return;
         }
 
-        
+
         frames_left -= frame_count;
         if (frames_left <= 0) {
             break;
@@ -366,7 +366,7 @@ void App::initAudio() {
     instream = soundio_instream_create(in_device);
 
     instream->name = "Input";
-    instream->sample_rate = 48000;
+    instream->sample_rate = 44100;
     instream->format = SoundIoFormatFloat32NE;
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
@@ -702,7 +702,9 @@ int App::launch() {
         SDL_GetWindowSize(mainWindow, &winWidth, &winHeight);
         glViewport(0, 0, winWidth, winHeight);
 
-        auto textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond)).c_str());
+        auto note = tones[(int)round(fmod(currentNote, 12.0)) % 12];
+
+        auto textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond) + " " + note).c_str());
         g_vertex_buffer_data[0+0*4] = 0.0f;
         g_vertex_buffer_data[1+0*4] = 0.0f;
         g_vertex_buffer_data[0+1*4] = 0.0f;
@@ -738,7 +740,7 @@ int App::launch() {
         glDrawArrays(GL_TRIANGLES, 0, 3*2);
 
         glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence);
-        glUniform2f(square.uniform("viewOffset"), 300, winHeight - currentNote * 40 + 50);
+        glUniform2f(square.uniform("viewOffset"), 300, winHeight - ((int)round(currentNote) % 12) * 40 + 50);
         glUniform1f(square.uniform("textureOpacity"), 0.0);
         glDrawArrays(GL_TRIANGLES, 0, 3*2);
         glUniform4f(square.uniform("bgColor"), 1.0, 0.2, 0.0, currentConfidence2);
