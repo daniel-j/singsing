@@ -4,6 +4,7 @@
 #include "app.hpp"
 #include <iostream>
 #include <fstream>
+#include <algorithm>    // std::min
 // #include <portaudio.h>
 #include <soundio/soundio.h>
 #include "shader.hpp"
@@ -13,12 +14,15 @@
 #include "base/ringbuffer.hpp"
 #include "util/fpscounter.hpp"
 
-const int ANALYSIS_BUFFER_LENGTH = 4096;
+const int ANALYSIS_BUFFER_LENGTH = 2048;
+const int ANALYSIS_HOP_SIZE = ANALYSIS_BUFFER_LENGTH / 4;
 
-RingBuffer<float> ring(ANALYSIS_BUFFER_LENGTH + 1);
-float currentNote = 0.0;
+struct SoundIoRingBuffer *ring_buffer = NULL;
+
+//RingBuffer<float> ring(ANALYSIS_BUFFER_LENGTH + 1);
+float currentNote1 = 0.0;
 float currentNote2 = 0.0;
-float currentConfidence = 0.0;
+float currentConfidence1 = 0.0;
 float currentConfidence2 = 0.0;
 std::mutex audioMutex;
 
@@ -149,132 +153,60 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
     return paContinue;
 }
 */
-void App::analyzeAudio(const int& channel, const float* const buffer, float* const pitch, float* const probability, const bool useAubio) {
-    if (useAubio) {
-        fvec_t out = {
-            1,
-            pitch
-        };
-        fvec_t buf = {
-            ANALYSIS_BUFFER_LENGTH,
-            (float*)buffer
-        };
-        aubio_pitch_do (aubioPitchChannels[channel], &buf, &out);
-        *probability = aubio_pitch_get_confidence(aubioPitchChannels[channel]);
-        //std::cout << "A: " << *pitch << " " << *probability << std::endl;
-    } else {
-        *pitch = yinChannels[channel].getPitch(buffer, 0);
-        *probability = yinChannels[channel].getProbability();
-        //std::cout << "B: " << *pitch << " " << *probability << std::endl;
+void App::analyzeAudio(const int& channel, const float* const buffer, float* const pitch, float* const probability) {
+    float channelBuffer[ANALYSIS_HOP_SIZE];
+    for (int i = 0; i < ANALYSIS_HOP_SIZE; ++i) {
+        channelBuffer[i] = buffer[i * 2 + channel];
     }
+
+    fvec_t out = {
+        1,
+        pitch
+    };
+    fvec_t buf = {
+        ANALYSIS_HOP_SIZE,
+        (float*)&channelBuffer
+    };
+    aubio_pitch_do(aubioPitchChannels[channel], &buf, &out);
+    *probability = aubio_pitch_get_confidence(aubioPitchChannels[channel]);
+    //std::cout << "A: " << *pitch << " " << *probability << std::endl;
+
+    // *pitch = yinChannels[channel].getPitch(buffer, 0);
+    // *probability = yinChannels[channel].getProbability();
+    //std::cout << "B: " << *pitch << " " << *probability << std::endl;
 }
 
-App::App() {
-
-}
-App::~App() {
-    if (glctx) SDL_GL_DeleteContext(glctx);
-    if (renderer) SDL_DestroyRenderer(renderer);
-    if (mainWindow) SDL_DestroyWindow(mainWindow);
-    TTF_Quit();
-    SDL_Quit();
-    // Pa_Terminate();
-    soundio_instream_destroy(instream);
-    soundio_device_unref(in_device);
-    soundio_destroy(soundio);
-    if (yinChannels) delete[] yinChannels;
-    if (aubioPitchChannels) {
-        del_aubio_pitch(aubioPitchChannels[0]);
-        del_aubio_pitch(aubioPitchChannels[1]);
-    }
-}
-
-int App::init() {
-
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
-        std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
-        return 1;
-    }
-
-    initAudio();
-
-    if (TTF_Init() == -1) {
-        std::cerr << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
-        return 1;
-    }
-
-    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    // SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-
-    mainWindow = SDL_CreateWindow("singsing",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        640, 480,
-        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
-    if (!mainWindow) {
-        std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
-        return 1;
-    }
-
-    glctx = SDL_GL_CreateContext(mainWindow);
-    if (!glctx) {
-        std::cerr << "Error: OpenGL context could not be created! " << SDL_GetError() << std::endl;
-        return 1;
-    }
-
-    SDL_GL_SetSwapInterval(1);
-
-    glewExperimental = GL_TRUE;
-    glewInit();
-
-    std::cout << "GL_VERSION " << glGetString(GL_VERSION) << std::endl <<
-                 "GL_RENDERER " << glGetString(GL_RENDERER) << std::endl;
-
-    glDepthMask( GL_FALSE );
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    SDL_GL_SwapWindow(mainWindow);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    return 0;
-}
-
-void checkRingbuffer(App* app) {
-    float pitch, probability, note, toneAccuracy;
+void checkRingbuffer(App* app, int bytes_per_frame) {
+    float pitch1, probability1, note1, toneAccuracy;
     float pitch2, probability2, note2;
     int tone;
     float threshold = 0.03f;
 
-    // app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
-    app->analyzeAudio(0, ring.buffer(), &pitch2, &probability2, true);
+    float *read_ptr = (float*)soundio_ring_buffer_read_ptr(ring_buffer);
+    int fill_bytes = soundio_ring_buffer_fill_count(ring_buffer);
 
-    for (int i = 0; i < ANALYSIS_BUFFER_LENGTH / 2; ++i) {
-        ring.get();
-    }
+    // std::cout << fill_bytes << std::endl;
+
+    // app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
+    app->analyzeAudio(0, read_ptr, &pitch1, &probability1);
+    app->analyzeAudio(1, read_ptr, &pitch2, &probability2);
+
+    soundio_ring_buffer_advance_read_ptr(ring_buffer, ANALYSIS_HOP_SIZE * bytes_per_frame);
 
     static auto LOG2 = log(2.0);
-    note = 12.0 * (log(pitch / 440.0) / LOG2) + 69.0;
-    currentNote = fmod(note, 12.0);
-    currentConfidence = probability;
+    note1 = 12.0 * (log(pitch1 / 440.0) / LOG2) + 69.0;
+    currentNote1 = fmod(note1, 12.0);
+    currentConfidence1 = probability1;
 
     note2 = 12.0 * (log(pitch2 / 440.0) / LOG2) + 69.0;
     currentNote2 = fmod(note2, 12.0);
     currentConfidence2 = probability2;
 
-    if (pitch > 0.0 && probability > 0.1/* && amplitude >= threshold*/) {
-
-        tone = (int)round(fmod(note, 12.0)) % 12;
-        toneAccuracy = round(fmod(note, 12.0)) - fmod(note, 12.0);
+    if (pitch1 > 0.0 && probability1 > 0.1/* && amplitude >= threshold*/) {
+        tone = (int)round(fmod(note1, 12.0)) % 12;
+        toneAccuracy = round(fmod(note1, 12.0)) - fmod(note1, 12.0);
 
         //std::cout << pitch << " " << tone << " " << tones[tone] << " " << probability << std::endl;
-
     } else {
         //printf("%f\n", amplitude);
     }
@@ -286,15 +218,27 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
     auto app = (App*)instream->userdata;
     struct SoundIoChannelArea *areas;
 
-    float amplitude = 0.0f;
-    int frames_left = frame_count_max;
+    char *write_ptr = soundio_ring_buffer_write_ptr(ring_buffer);
+    int free_bytes = soundio_ring_buffer_free_count(ring_buffer);
+    int free_count = free_bytes / instream->bytes_per_frame;
+
+    if (frame_count_min > free_count) {
+        std::cerr << "Ring buffer overflow " << frame_count_min << " " << free_count << std::endl;
+    }
+
+    int write_frames = std::min(free_count, frame_count_max);
+    int frames_left = write_frames;
+
+    // std::cout << frame_count_max << std::endl;
+
+    // int frames_left = frame_count_max;
 
     for (;;) {
         int frame_count = frames_left;
         int err;
 
         if ((err = soundio_instream_begin_read(instream, &areas, &frame_count))) {
-            fprintf(stderr, "begin read error: %s", soundio_strerror(err));
+            fprintf(stderr, "begin read error: %s\n", soundio_strerror(err));
             return;
         }
 
@@ -305,19 +249,14 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
         }
 
         if (!areas) {
+            memset(write_ptr, 0, frame_count * instream->bytes_per_frame);
             fprintf(stderr, "Dropped %d frames due to internal overflow\n", frame_count);
         } else {
             for (int frame = 0; frame < frame_count; frame += 1) {
-                float* ptr = (float*)areas[0].ptr;
-                //printf("%f\n", *(float*)areas[0].ptr);
-                ring.put(*ptr);
-                float volume = abs(*ptr);
-                if (volume > amplitude) {
-                    amplitude = volume;
-                }
-                areas[0].ptr += areas[0].step;
-                if (ring.length() >= ANALYSIS_BUFFER_LENGTH) {
-                    checkRingbuffer(app);
+                for (int ch = 0; ch < instream->layout.channel_count; ch++) {
+                    memcpy(write_ptr, areas[ch].ptr, instream->bytes_per_sample);
+                    areas[ch].ptr += areas[ch].step;
+                    write_ptr += instream->bytes_per_sample;
                 }
             }
         }
@@ -333,6 +272,17 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
             break;
         }
     }
+
+    int advance_bytes = write_frames * instream->bytes_per_sample;
+    soundio_ring_buffer_advance_write_ptr(ring_buffer, advance_bytes);
+
+    //std::cout << advance_bytes / instream->bytes_per_frame << " " << soundio_ring_buffer_fill_count(ring_buffer) / instream->bytes_per_frame << ">=" << ANALYSIS_HOP_SIZE << " ";
+
+    while (soundio_ring_buffer_fill_count(ring_buffer) >= ANALYSIS_HOP_SIZE * instream->bytes_per_frame) {
+        //std::cout << "analyze ";
+        checkRingbuffer(app, instream->bytes_per_frame);
+    }
+    //std::cout << std::endl;
 }
 
 void overflow_callback(struct SoundIoInStream *instream) {
@@ -371,19 +321,28 @@ void App::initAudio() {
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
     instream->userdata = this;
-    instream->software_latency = 0.025; // 25 ms
+    instream->software_latency = 0.010; // 10 ms
 
     std::cout << "Software latency: " << instream->software_latency << std::endl;
 
     if ((err = soundio_instream_open(instream))) {
         fprintf(stderr, "unable to open input stream: %s", soundio_strerror(err));
+        return;
+    }
+
+    // single channel
+    int capacity = instream->software_latency * 2.0 * (float)instream->sample_rate * instream->bytes_per_frame;
+    ring_buffer = soundio_ring_buffer_create(soundio, capacity);
+    if (!ring_buffer) {
+        std::cerr << "Unable to create ring buffer: Out of memory" << std::endl;
+        return;
     }
 
     aubioPitchChannels = (aubio_pitch_t **)malloc(sizeof(aubio_pitch_t *) * instream->layout.channel_count);
-    yinChannels = new Yin[instream->layout.channel_count];
+    // yinChannels = new Yin[instream->layout.channel_count];
     for (int channel = 0; channel < instream->layout.channel_count; ++channel) {
-        aubioPitchChannels[channel] = new_aubio_pitch((char*)"yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, instream->sample_rate);
-        yinChannels[channel].initialize(instream->sample_rate, ANALYSIS_BUFFER_LENGTH, 1.0);
+        aubioPitchChannels[channel] = new_aubio_pitch((char*)"yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_HOP_SIZE, instream->sample_rate);
+        // yinChannels[channel].initialize(instream->sample_rate, ANALYSIS_BUFFER_LENGTH, 1.0);
     }
 
     if ((err = soundio_instream_start(instream))) {
@@ -428,7 +387,7 @@ void App::initAudio() {
     want.samples = 256;
     want.callback = NULL;
 
-    auto dev = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, 1), 0, &want, &have, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    auto dev = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, 1), 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
     if (dev == 0) {
         SDL_Log("Failed to open audio: %s", SDL_GetError());
     } else {
@@ -555,6 +514,83 @@ void ImageToTexture( GLuint tex, const char* imgpath ) {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+App::App() {
+
+}
+App::~App() {
+    if (glctx) SDL_GL_DeleteContext(glctx);
+    if (renderer) SDL_DestroyRenderer(renderer);
+    if (mainWindow) SDL_DestroyWindow(mainWindow);
+    TTF_Quit();
+    SDL_Quit();
+    // Pa_Terminate();
+    // soundio_ring_buffer_destroy(ring_buffer);
+    soundio_instream_destroy(instream);
+    soundio_device_unref(in_device);
+    soundio_destroy(soundio);
+    if (yinChannels) delete[] yinChannels;
+    if (aubioPitchChannels) {
+        del_aubio_pitch(aubioPitchChannels[0]);
+        del_aubio_pitch(aubioPitchChannels[1]);
+    }
+}
+
+int App::init() {
+
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
+        std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
+        return 1;
+    }
+
+    initAudio();
+
+    if (TTF_Init() == -1) {
+        std::cerr << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        return 1;
+    }
+
+    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    // SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+
+    mainWindow = SDL_CreateWindow("singsing",
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        640, 480,
+        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+    if (!mainWindow) {
+        std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
+        return 1;
+    }
+
+    glctx = SDL_GL_CreateContext(mainWindow);
+    if (!glctx) {
+        std::cerr << "Error: OpenGL context could not be created! " << SDL_GetError() << std::endl;
+        return 1;
+    }
+
+    SDL_GL_SetSwapInterval(1);
+
+    glewExperimental = GL_TRUE;
+    glewInit();
+
+    std::cout << "GL_VERSION " << glGetString(GL_VERSION) << std::endl <<
+                 "GL_RENDERER " << glGetString(GL_RENDERER) << std::endl;
+
+    glDepthMask( GL_FALSE );
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    SDL_GL_SwapWindow(mainWindow);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    return 0;
+}
 
 int App::launch() {
 
@@ -565,6 +601,7 @@ int App::launch() {
     auto finishedHeaders = false;
     auto endFound = false;
 
+    /*
     for (std::string line; std::getline(filein, line); ) {
         if (!line.empty() && *line.rbegin() == '\r') {
             line.erase( line.length() - 1, 1);
@@ -627,6 +664,7 @@ int App::launch() {
         std::cerr << "Lyrics/Notes missing" << std::endl;
         return 0;
     }
+    */
 
     Shader square;
     square.init("../shaders/vert.glsl", "../shaders/frag.glsl");
@@ -737,8 +775,8 @@ int App::launch() {
 
         glDrawArrays(GL_TRIANGLES, 0, 3*2);
 
-        glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence);
-        glUniform2f(square.uniform("viewOffset"), 300, winHeight - currentNote * 40 + 50);
+        glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence1);
+        glUniform2f(square.uniform("viewOffset"), 300, winHeight - currentNote1 * 40 + 50);
         glUniform1f(square.uniform("textureOpacity"), 0.0);
         glDrawArrays(GL_TRIANGLES, 0, 3*2);
         glUniform4f(square.uniform("bgColor"), 1.0, 0.2, 0.0, currentConfidence2);

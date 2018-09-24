@@ -19,5 +19,5 @@ class App {
     ~App();
     int init();
     int launch();
-    void analyzeAudio(const int& channel, const float * const buffer, float * const pitch, float * const probability, const bool useAubio = false);
+    void analyzeAudio(const int& channel, const float * const buffer, float * const pitch, float * const probability);
 };

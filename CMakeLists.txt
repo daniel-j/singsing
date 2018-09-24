@@ -16,8 +16,6 @@ file(GLOB_RECURSE headers
     ${CMAKE_SOURCE_DIR}/src/*.hpp
 )
 
-add_executable(${PROJECT_NAME} ${sources} ${headers})
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 find_package(OpenGL REQUIRED)
@@ -29,6 +27,8 @@ find_package(SDL2_ttf REQUIRED)
 # find_package(PortAudio REQUIRED)
 find_package(aubio REQUIRED)
 find_package(SoundIo REQUIRED)
+
+add_executable(${PROJECT_NAME} ${sources} ${headers})
 
 target_link_libraries(
     ${PROJECT_NAME}

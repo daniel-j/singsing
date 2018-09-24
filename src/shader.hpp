@@ -144,7 +144,7 @@ class Shader {
         std::cout << "Linker error message : " << shaderProgramInfoLog << std::endl;
 
         // Handle the error by printing it to the console
-        delete shaderProgramInfoLog;
+        delete[] shaderProgramInfoLog;
         return;
     }
 
@@ -167,7 +167,7 @@ class Shader {
         }
 
         // Print shader info log
-        delete shaderInfoLog;
+        delete[] shaderInfoLog;
     }
 
     // The handle to our shader program
