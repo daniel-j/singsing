@@ -274,10 +274,10 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
         }
     }
 
-    int advance_bytes = write_frames * instream->bytes_per_sample;
+    int advance_bytes = write_frames * instream->bytes_per_frame;
     soundio_ring_buffer_advance_write_ptr(ring_buffer, advance_bytes);
 
-    //std::cout << advance_bytes / instream->bytes_per_frame << " " << soundio_ring_buffer_fill_count(ring_buffer) / instream->bytes_per_frame << ">=" << ANALYSIS_HOP_SIZE << " ";
+    //std::cout << write_frames << " " << soundio_ring_buffer_fill_count(ring_buffer) / instream->bytes_per_frame << ">=" << ANALYSIS_HOP_SIZE << " ";
 
     while (soundio_ring_buffer_fill_count(ring_buffer) >= ANALYSIS_HOP_SIZE * instream->bytes_per_frame) {
         //std::cout << "analyze ";
@@ -317,7 +317,7 @@ void App::initAudio() {
     instream = soundio_instream_create(in_device);
 
     instream->name = "Input #1";
-    instream->sample_rate = soundio_device_nearest_sample_rate(in_device, 48000);
+    instream->sample_rate = soundio_device_nearest_sample_rate(in_device, 44100);
     instream->format = SoundIoFormatFloat32NE;
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
@@ -561,7 +561,7 @@ int App::init() {
 
     mainWindow = SDL_CreateWindow("singsing",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        640, 480,
+        1280, 720,
         SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
     if (!mainWindow) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
@@ -791,7 +791,7 @@ int App::launch() {
         glUniform1f(square.uniform("textureOpacity"), 0.0);
         glDrawArrays(GL_TRIANGLES, 0, 3*2);
         glUniform4f(square.uniform("bgColor"), 1.0, 0.2, 0.0, currentConfidence2);
-        glUniform2f(square.uniform("viewOffset"), 450, winHeight - currentNote2 * 40 + 50);
+        glUniform2f(square.uniform("viewOffset"), 600, winHeight - currentNote2 * 40 + 50);
         glDrawArrays(GL_TRIANGLES, 0, 3*2);
         glDisableVertexAttribArray(square.attribute("position"));
         glDisableVertexAttribArray(square.attribute("texcoord"));
