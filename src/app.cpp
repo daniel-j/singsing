@@ -365,8 +365,8 @@ void App::initAudio() {
 
     instream = soundio_instream_create(in_device);
 
-    instream->name = "Input";
-    instream->sample_rate = 48000;
+    instream->name = "Input #1";
+    instream->sample_rate = soundio_device_nearest_sample_rate(in_device, 48000);
     instream->format = SoundIoFormatFloat32NE;
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
