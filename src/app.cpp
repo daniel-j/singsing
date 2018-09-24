@@ -203,8 +203,8 @@ void checkRingbuffer(App* app, int bytes_per_frame) {
     currentConfidence2 = probability2;
 
     if (pitch1 > 0.0 && probability1 > 0.1/* && amplitude >= threshold*/) {
-        tone = (int)round(fmod(note1, 12.0)) % 12;
-        toneAccuracy = round(fmod(note1, 12.0)) - fmod(note1, 12.0);
+        // tone = (int)round(fmod(note1, 12.0)) % 12;
+        // toneAccuracy = round(fmod(note1, 12.0)) - fmod(note1, 12.0);
 
         //std::cout << pitch << " " << tone << " " << tones[tone] << " " << probability << std::endl;
     } else {
@@ -266,7 +266,7 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
             return;
         }
 
-        
+
         frames_left -= frame_count;
         if (frames_left <= 0) {
             break;
@@ -740,7 +740,9 @@ int App::launch() {
         SDL_GetWindowSize(mainWindow, &winWidth, &winHeight);
         glViewport(0, 0, winWidth, winHeight);
 
-        auto textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond)).c_str());
+        auto note = tones[(int)currentNote1 % 12];
+
+        auto textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond) + " " + note).c_str());
         g_vertex_buffer_data[0+0*4] = 0.0f;
         g_vertex_buffer_data[1+0*4] = 0.0f;
         g_vertex_buffer_data[0+1*4] = 0.0f;
