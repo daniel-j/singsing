@@ -13,6 +13,7 @@
 #include <SDL2/SDL_ttf.h>
 #include "base/ringbuffer.hpp"
 #include "util/fpscounter.hpp"
+#include "mpv.hpp"
 
 const int ANALYSIS_BUFFER_LENGTH = 2048;
 const int ANALYSIS_HOP_SIZE = ANALYSIS_BUFFER_LENGTH / 4;
@@ -518,6 +519,7 @@ App::App() {
 
 }
 App::~App() {
+    mpv_destroy();
     if (glctx) SDL_GL_DeleteContext(glctx);
     if (renderer) SDL_DestroyRenderer(renderer);
     if (mainWindow) SDL_DestroyWindow(mainWindow);
@@ -588,6 +590,8 @@ int App::init() {
     SDL_GL_SwapWindow(mainWindow);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    init_mpv();
 
     return 0;
 }
@@ -721,6 +725,8 @@ int App::launch() {
         return 1;
     }
 
+    // mpv_play();
+
     GLuint fpsTexture;
     glGenTextures( 1, &fpsTexture );
 
@@ -733,12 +739,15 @@ int App::launch() {
                 isrunning = false;
                 break;
               }
+              mpv_process_sdl_event(&e);
         }
         if (!isrunning) break;
         float framespersecond = fpsupdate();
         int winWidth, winHeight;
         SDL_GetWindowSize(mainWindow, &winWidth, &winHeight);
         glViewport(0, 0, winWidth, winHeight);
+
+        mpv_render(winWidth, winHeight);
 
         auto note = tones[(int)currentNote1 % 12];
 

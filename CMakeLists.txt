@@ -27,6 +27,7 @@ find_package(SDL2_ttf REQUIRED)
 # find_package(PortAudio REQUIRED)
 find_package(aubio REQUIRED)
 find_package(SoundIo REQUIRED)
+find_package(MPV REQUIRED)
 
 add_executable(${PROJECT_NAME} ${sources} ${headers})
 
@@ -41,4 +42,5 @@ target_link_libraries(
     ${AUBIO_LIBRARIES}
     # ${PORTAUDIO_LIBRARIES}
     ${SOUNDIO_LIBRARY}
+    ${MPV_LIBRARY}
 )
