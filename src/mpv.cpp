@@ -126,7 +126,8 @@ int mpv_process_sdl_event(SDL_Event* event) {
 
 void mpv_play(std::string videoFile, std::string audioFile) {
     // Play this file. Note that this starts playback asynchronously.
-    mpv_command(mpv, (const char *[]){"loadfile", videoFile.c_str(), NULL});
+    const char *command[] = {"loadfile", videoFile.c_str(), NULL};
+    mpv_command(mpv, command);
 
     if (!audioFile.empty()) {
         mpv_set_option_string(mpv, "audio-files", audioFile.c_str());

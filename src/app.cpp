@@ -18,20 +18,20 @@
 const int ANALYSIS_BUFFER_LENGTH = 2048;
 const int ANALYSIS_HOP_SIZE = ANALYSIS_BUFFER_LENGTH / 4;
 
-struct SoundIoRingBuffer *ring_buffer = NULL;
+static struct SoundIoRingBuffer *ring_buffer = nullptr;
 
 //RingBuffer<float> ring(ANALYSIS_BUFFER_LENGTH + 1);
-float currentNote1 = 0.0;
-float currentNote2 = 0.0;
-float currentConfidence1 = 0.0;
-float currentConfidence2 = 0.0;
-std::mutex audioMutex;
+static float currentNote1 = 0.0;
+static float currentNote2 = 0.0;
+static float currentConfidence1 = 0.0;
+static float currentConfidence2 = 0.0;
+// static std::mutex audioMutex;
 
-struct SoundIo *soundio;
-struct SoundIoDevice *in_device;
-struct SoundIoInStream *instream;
+static struct SoundIo *soundio;
+static struct SoundIoDevice *in_device;
+static struct SoundIoInStream *instream;
 
-std::string tones[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+static std::string tones[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 /*
 int recordCallback(const void *inputBuffer, void *outputBuffer,
                    unsigned long framesPerBuffer,
@@ -178,13 +178,13 @@ void App::analyzeAudio(const int& channel, const float* const buffer, float* con
 }
 
 void checkRingbuffer(App* app, int bytes_per_frame) {
-    float pitch1, probability1, note1, toneAccuracy;
+    float pitch1, probability1, note1;
     float pitch2, probability2, note2;
     int tone;
     float threshold = 0.03f;
 
     float *read_ptr = (float*)soundio_ring_buffer_read_ptr(ring_buffer);
-    int fill_bytes = soundio_ring_buffer_fill_count(ring_buffer);
+    // int fill_bytes = soundio_ring_buffer_fill_count(ring_buffer);
 
     // std::cout << fill_bytes << std::endl;
 
@@ -332,7 +332,7 @@ void App::initAudio() {
     }
 
     // single channel
-    int capacity = instream->software_latency * 2.0 * (float)instream->sample_rate * instream->bytes_per_frame;
+    int capacity = instream->sample_rate * instream->bytes_per_frame * 2 * instream->software_latency;
     ring_buffer = soundio_ring_buffer_create(soundio, capacity);
     if (!ring_buffer) {
         std::cerr << "Unable to create ring buffer: Out of memory" << std::endl;
@@ -478,7 +478,7 @@ void App::initAudio() {
 }
 
 SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, uint8_t r, uint8_t g, uint8_t b, const char* text ) {
-    SDL_Color fg = { r, g, b };
+    SDL_Color fg = { r, g, b, 255 };
     auto s1 = TTF_RenderText_Blended(font, text, fg);
     auto s2 = SDL_ConvertSurfaceFormat(s1, SDL_PIXELFORMAT_RGBA32, 0);
     SDL_FreeSurface( s1 );
@@ -509,9 +509,9 @@ void ImageToTexture( GLuint tex, const char* imgpath ) {
     glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, s1->w, s1->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, s1->pixels );
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, s2->w, s2->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, s2->pixels );
 
-    SDL_FreeSurface( s1 );
+    SDL_FreeSurface( s2 );
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -673,10 +673,6 @@ int App::launch() {
     Shader square;
     square.init("../shaders/vert.glsl", "../shaders/frag.glsl");
 
-    GLuint VertexArrayID;
-    glGenVertexArrays(1, &VertexArrayID);
-    glBindVertexArray(VertexArrayID);
-
     GLfloat g_vertex_buffer_data[] = {
          0.0f,   0.0f,    0.0f, 0.0f,
          0.0f,  50.0f,    0.0f, 1.0f,
@@ -725,7 +721,7 @@ int App::launch() {
         return 1;
     }
 
-    // mpv_play();
+    mpv_play();
 
     GLuint fpsTexture;
     glGenTextures( 1, &fpsTexture );
@@ -745,11 +741,13 @@ int App::launch() {
         float framespersecond = fpsupdate();
         int winWidth, winHeight;
         SDL_GetWindowSize(mainWindow, &winWidth, &winHeight);
+
         glViewport(0, 0, winWidth, winHeight);
 
-        mpv_render(winWidth, winHeight);
-
-        auto note = tones[(int)currentNote1 % 12];
+        std::string note = "";
+        if (!isnan(currentNote1)) {
+          note = tones[(int)(currentNote1) % 12];
+        }
 
         auto textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond) + " " + note).c_str());
         g_vertex_buffer_data[0+0*4] = 0.0f;
@@ -772,6 +770,10 @@ int App::launch() {
         glClearColor(0.0, 0.0, 0.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        mpv_render(winWidth, winHeight);
+
+        glEnable(GL_BLEND);
+
         square.use();
 
         glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
@@ -780,7 +782,7 @@ int App::launch() {
         glEnableVertexAttribArray(square.attribute("texcoord"));
         glUniform2f(square.uniform("viewportSize"), winWidth, winHeight);
         glUniform2f(square.uniform("viewOffset"), 0, 0);
-        glUniform4f(square.uniform("bgColor"), 1.0, 0.0, 1.0, 0.0);
+        glUniform4f(square.uniform("bgColor"), 1.0, 0.0, 1.0, 0.5);
         glUniform1f(square.uniform("textureOpacity"), 1.0);
         glBindTexture(GL_TEXTURE_2D, fpsTexture);
 

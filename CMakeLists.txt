@@ -17,6 +17,7 @@ file(GLOB_RECURSE headers
 )
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
+set(OpenGL_GL_PREFERENCE "GLVND")
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
