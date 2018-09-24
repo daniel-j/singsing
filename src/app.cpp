@@ -605,7 +605,6 @@ int App::launch() {
     auto finishedHeaders = false;
     auto endFound = false;
 
-    /*
     for (std::string line; std::getline(filein, line); ) {
         if (!line.empty() && *line.rbegin() == '\r') {
             line.erase( line.length() - 1, 1);
@@ -668,7 +667,6 @@ int App::launch() {
         std::cerr << "Lyrics/Notes missing" << std::endl;
         return 0;
     }
-    */
 
     Shader square;
     square.init("../shaders/vert.glsl", "../shaders/frag.glsl");
@@ -721,7 +719,7 @@ int App::launch() {
         return 1;
     }
 
-    mpv_play();
+    mpv_play("https://www.youtube.com/watch?v=ywjyeaMUibM");
 
     GLuint fpsTexture;
     glGenTextures( 1, &fpsTexture );
