@@ -331,8 +331,7 @@ void App::initAudio() {
         return;
     }
 
-    // single channel
-    int capacity = instream->sample_rate * instream->bytes_per_frame * 2 * instream->software_latency;
+    int capacity = instream->bytes_per_frame * ANALYSIS_BUFFER_LENGTH;
     ring_buffer = soundio_ring_buffer_create(soundio, capacity);
     if (!ring_buffer) {
         std::cerr << "Unable to create ring buffer: Out of memory" << std::endl;
@@ -352,129 +351,6 @@ void App::initAudio() {
 
     fprintf(stderr, "%s %d Hz %s interleaved\n",
                 instream->layout.name, instream->sample_rate, soundio_format_string(instream->format));
-
-    return;
-
-#if SDL_AUDIO_DRIVER_ALSAA
-    if (SDL_AudioInit("alsa")) {
-        std::cerr << "Failed to initialize ALSA" << std::endl;
-        SDL_AudioInit(NULL);
-    }
-#endif
-
-    const char* driver_name = SDL_GetCurrentAudioDriver();
-
-    if (driver_name) {
-        printf("Audio subsystem initialized; driver = %s.\n", driver_name);
-    } else {
-        printf("Audio subsystem not initialized.\n");
-    }
-
-    /*for (int i = 0; i < SDL_GetNumAudioDrivers(); ++i) {
-        printf("Audio driver %d: %s\n", i, SDL_GetAudioDriver(i));
-    }*/
-
-    int i, count = SDL_GetNumAudioDevices(1);
-    std::cout << "Number of devices: " << count << std::endl;
-    for (i = 0; i < count; ++i) {
-        printf("Audio device %d: %s\n", i, SDL_GetAudioDeviceName(i, 1));
-    }
-
-    SDL_AudioSpec want, have;
-    SDL_zero(want);
-    want.freq = 44100;
-    want.format = AUDIO_F32;
-    want.channels = 2;
-    want.samples = 256;
-    want.callback = NULL;
-
-    auto dev = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, 1), 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
-    if (dev == 0) {
-        SDL_Log("Failed to open audio: %s", SDL_GetError());
-    } else {
-        if (have.format != want.format) { /* we let this one thing change. */
-            SDL_Log("We didn't get Float32 audio format.");
-        }
-        SDL_PauseAudioDevice(dev, 0); /* start audio playing. */
-        // SDL_Delay(5000); /* let the audio callback play some sound for 5 seconds. */
-        SDL_CloseAudioDevice(dev);
-    }
-
-    /*
-    PaError err = paNoError;
-    PaStreamParameters inputParameters, outputParameters;
-    err = Pa_Initialize();
-    if( err != paNoError ) {
-        std::cerr << "Unable to initialize PortAudio" << std::endl;
-        return;
-    }
-    std::cout << "PortAudio version: " << Pa_GetVersionText() << "" << std::endl;
-
-    auto numDevices = Pa_GetDeviceCount();
-    std::cout << "Number of devices = " << numDevices << std::endl;
-
-    auto defaultInput = Pa_GetDefaultInputDevice();
-    auto defaultOutput = Pa_GetDefaultOutputDevice();
-
-    for (int i = 0; i < numDevices; i++) {
-        auto deviceInfo = Pa_GetDeviceInfo( i );
-        std::cout << "Name: " << deviceInfo->name;
-        if (i == defaultInput) {
-            std::cout << " [Default Input]";
-        } else if( i == Pa_GetHostApiInfo( deviceInfo->hostApi )->defaultInputDevice ) {
-            const PaHostApiInfo *hostInfo = Pa_GetHostApiInfo( deviceInfo->hostApi );
-            std::cout << " [Default " << hostInfo->name << " Input]";
-        }
-        if (i == defaultOutput) {
-            std::cout << " [Default Output]";
-        } else if (i == Pa_GetHostApiInfo( deviceInfo->hostApi )->defaultOutputDevice) {
-            const PaHostApiInfo *hostInfo = Pa_GetHostApiInfo( deviceInfo->hostApi );
-            std::cout << " [Default " << hostInfo->name << " Output]";
-        }
-        std::cout << std::endl;
-        printf( "Host API: %s\n",  Pa_GetHostApiInfo( deviceInfo->hostApi )->name );
-        printf( "Max input/output channels: %d/%d\n", deviceInfo->maxInputChannels, deviceInfo->maxOutputChannels );
-
-        printf( "Default low input latency   = %8.4f\n", deviceInfo->defaultLowInputLatency  );
-        printf( "Default low output latency  = %8.4f\n", deviceInfo->defaultLowOutputLatency  );
-        printf( "Default high input latency  = %8.4f\n", deviceInfo->defaultHighInputLatency  );
-        printf( "Default high output latency = %8.4f\n", deviceInfo->defaultHighOutputLatency  );
-
-        printf( "Default sample rate:  %8.2f\n", deviceInfo->defaultSampleRate );
-    }
-
-    PaStream* stream;
-    PaStreamParameters inputParams;
-    inputParams.device = defaultInput; // default input device
-    auto deviceInfo = Pa_GetDeviceInfo( inputParams.device );
-    inputParams.channelCount = 2; // stereo input
-    inputParams.sampleFormat = paFloat32|paNonInterleaved; // float
-    inputParams.suggestedLatency = (deviceInfo->defaultSampleRate/(float)ANALYSIS_BUFFER_LENGTH)/1000.0 + 0.01;//Pa_GetDeviceInfo( inputParams.device )->defaultHighInputLatency;
-    inputParams.hostApiSpecificStreamInfo = NULL;
-
-    err = Pa_OpenStream(
-        &stream,
-        &inputParams,
-        NULL,
-        deviceInfo->defaultSampleRate,
-        ANALYSIS_BUFFER_LENGTH,
-        paNoFlag,
-        recordCallback,
-        this);
-    if ( err != paNoError ) {
-        std::cerr << "Unable to open input stream" << std::endl;
-    }
-    yinChannels = new Yin[inputParams.channelCount];
-    aubioPitchChannels = (aubio_pitch_t **)malloc(sizeof(aubio_pitch_t *) * inputParams.channelCount);
-    for (int channel = 0; channel < inputParams.channelCount; ++channel) {
-        yinChannels[channel].initialize(deviceInfo->defaultSampleRate, ANALYSIS_BUFFER_LENGTH, 0.9);
-        aubioPitchChannels[channel] = new_aubio_pitch((char*)"yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, deviceInfo->defaultSampleRate);
-    }
-    err = Pa_StartStream(stream);
-    if ( err != paNoError ) {
-        std::cerr << "Unable to start input stream" << std::endl;
-    }
-    */
 }
 
 SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, uint8_t r, uint8_t g, uint8_t b, const char* text ) {
@@ -551,17 +427,17 @@ int App::init() {
         return 1;
     }
 
-    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     // SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
     mainWindow = SDL_CreateWindow("singsing",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        640, 480,
+        1280, 720,
         SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
     if (!mainWindow) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
@@ -585,13 +461,12 @@ int App::init() {
     glDepthMask( GL_FALSE );
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_DITHER);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     SDL_GL_SwapWindow(mainWindow);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    init_mpv();
 
     return 0;
 }
@@ -721,6 +596,7 @@ int App::launch() {
         return 1;
     }
 
+    init_mpv();
     mpv_play();
 
     GLuint fpsTexture;
@@ -770,22 +646,22 @@ int App::launch() {
         glClearColor(0.0, 0.0, 0.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        mpv_render(winWidth, winHeight);
+        mpv_render(winWidth, winHeight, 0, 0);
 
         glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         square.use();
-
         glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+        glBindTexture(GL_TEXTURE_2D, fpsTexture);
 
         glEnableVertexAttribArray(square.attribute("position"));
         glEnableVertexAttribArray(square.attribute("texcoord"));
         glUniform2f(square.uniform("viewportSize"), winWidth, winHeight);
         glUniform2f(square.uniform("viewOffset"), 0, 0);
+
         glUniform4f(square.uniform("bgColor"), 1.0, 0.0, 1.0, 0.5);
         glUniform1f(square.uniform("textureOpacity"), 1.0);
-        glBindTexture(GL_TEXTURE_2D, fpsTexture);
-
         glDrawArrays(GL_TRIANGLES, 0, 3*2);
 
         glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence1);
