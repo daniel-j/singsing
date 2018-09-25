@@ -7,6 +7,8 @@
 
 #include <SDL2/SDL.h>
 
+#include "mpv.hpp"
+
 #include <mpv/client.h>
 #include <mpv/render_gl.h>
 
@@ -48,6 +50,7 @@ int init_mpv() {
     mpv_set_option_string(mpv, "video-timing-offset", "0.0");
     mpv_set_option_string(mpv, "audio-client-name", "singsing");
     mpv_set_option_string(mpv, "video-latency-hacks", "yes");
+    mpv_set_option_string(mpv, "osd-level", "0");
 
     // Some minor options can only be set before mpv_initialize().
     if (mpv_initialize(mpv) < 0) {
@@ -92,7 +95,6 @@ int mpv_process_sdl_event(SDL_Event* event) {
     switch (event->type) {
     case SDL_WINDOWEVENT:
         if (event->window.event == SDL_WINDOWEVENT_EXPOSED) {
-            redraw = 1;
         }
         break;
     case SDL_KEYDOWN:
@@ -104,7 +106,6 @@ int mpv_process_sdl_event(SDL_Event* event) {
         // Happens when a new video frame should be rendered, or if the
         // current frame has to be redrawn e.g. due to OSD changes.
         if (event->type == wakeup_on_mpv_redraw) {
-            redraw = 1;
         }
         // Happens when at least 1 new event is in the mpv event queue.
         else if (event->type == wakeup_on_mpv_events) {
