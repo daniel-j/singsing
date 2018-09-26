@@ -353,9 +353,8 @@ void App::initAudio() {
                 instream->layout.name, instream->sample_rate, soundio_format_string(instream->format));
 }
 
-SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, uint8_t r, uint8_t g, uint8_t b, const char* text ) {
-    SDL_Color fg = { r, g, b, 255 };
-    auto s1 = TTF_RenderText_Blended(font, text, fg);
+SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, SDL_Color color, const std::string &text ) {
+    auto s1 = TTF_RenderUTF8_Blended(font, text.c_str(), color);
     auto s2 = SDL_ConvertSurfaceFormat(s1, SDL_PIXELFORMAT_RGBA32, 0);
     SDL_FreeSurface( s1 );
 
@@ -561,10 +560,10 @@ int App::launch() {
     }
 
     GLfloat g_vertex_buffer_data[] = {
-        0.0f,  0.0f,    0.0f, 0.0f,
-        0.0f,  1.0f,    0.0f, 1.0f,
-        1.0f,  0.0f,    1.0f, 0.0f,
-        1.0f,  1.0f,    1.0f, 1.0f
+        0.0f, 0.0f,    0.0f, 0.0f,
+        0.0f, 1.0f,    0.0f, 1.0f,
+        1.0f, 0.0f,    1.0f, 0.0f,
+        1.0f, 1.0f,    1.0f, 1.0f
     };
 
     // mpv framebuffer
@@ -583,6 +582,7 @@ int App::launch() {
     init_mpv();
     mpv_play("https://www.youtube.com/watch?v=ywjyeaMUibM");
 
+    SDL_Color textColor{255, 255, 255, 255};
     GLuint fpsTexture;
     glGenTextures( 1, &fpsTexture );
     SDL_Rect textureSize;
@@ -620,7 +620,7 @@ int App::launch() {
             if (!isnan(currentNote1)) {
               note = tones[(int)(currentNote1) % 12];
             }
-            textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond)).c_str());
+            textureSize = TextToTexture(fpsTexture, gFont, textColor, (std::string("FPS: ") + std::to_string((int)framespersecond)).c_str());
             last_time = now_time;
         }
 
