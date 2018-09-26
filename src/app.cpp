@@ -432,13 +432,11 @@ int App::init() {
     // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    // SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
     mainWindow = SDL_CreateWindow("singsing",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        1280, 720,
-        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+        640, 360,
+        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE/*|SDL_WINDOW_ALLOW_HIGHDPI*/);
     if (!mainWindow) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -455,17 +453,18 @@ int App::init() {
     glewExperimental = GL_TRUE;
     glewInit();
 
-    std::cout << "GL_VERSION " << glGetString(GL_VERSION) << std::endl <<
-                 "GL_RENDERER " << glGetString(GL_RENDERER) << std::endl;
+    std::cout << "GL_VENDOR " << glGetString(GL_VENDOR) << std::endl <<
+                 "GL_VERSION " << glGetString(GL_VERSION) << std::endl <<
+                 "GL_RENDERER " << glGetString(GL_RENDERER) << std::endl <<
+                 "GLSL_VERSION " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 
     glDepthMask( GL_FALSE );
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_DITHER);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     SDL_GL_SwapWindow(mainWindow);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     return 0;
@@ -545,50 +544,15 @@ int App::launch() {
     }
     */
 
-    Shader square;
-    square.init("../shaders/vert.glsl", "../shaders/frag.glsl");
-
-    GLfloat g_vertex_buffer_data[] = {
-         0.0f,   0.0f,    0.0f, 0.0f,
-         0.0f,  50.0f,    0.0f, 1.0f,
-       200.0f,   0.0f,    1.0f, 0.0f,
-
-       -1.0f,  1.0f,    0.0f, 1.0f,
-        1.0f, -1.0f,    1.0f, 0.0f,
-       -1.0f, -1.0f,    1.0f, 1.0f,
-    };
-
-    // This will identify our vertex buffer
-    GLuint vertexbuffer;
-    // Generate 1 buffer, put the resulting identifier in vertexbuffer
-    glGenBuffers(1, &vertexbuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-    glVertexAttribPointer(
-        square.attribute("position"),
-        2,                  // size
-        GL_FLOAT,           // type
-        GL_FALSE,           // normalized?
-        4 * sizeof(GLfloat),// stride
-        0                   // array buffer offset
-    );
-    glVertexAttribPointer(
-        square.attribute("texcoord"),
-        2,                  // size
-        GL_FLOAT,           // type
-        GL_FALSE,           // normalized?
-        4 * sizeof(GLfloat),// stride
-        (GLvoid*)(2 * sizeof(GLfloat)) // array buffer offset
-    );
-
 #ifdef __linux__
-    auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 48);
+    auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 24);
     if (!gFont) {
-        gFont = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48);
+        gFont = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24);
     }
 #elif __APPLE__
-    auto gFont = TTF_OpenFont("/Library/Fonts/Arial.ttf", 48);
+    auto gFont = TTF_OpenFont("/Library/Fonts/Arial.ttf", 24);
 #elif _WIN32
-    auto gFont = TTF_OpenFont("C:\\Windows\\Fonts\\arial.ttf", 48);
+    auto gFont = TTF_OpenFont("C:\\Windows\\Fonts\\arial.ttf", 24);
 #endif
 
     if (!gFont) {
@@ -596,14 +560,49 @@ int App::launch() {
         return 1;
     }
 
+    GLfloat g_vertex_buffer_data[] = {
+        0.0f,  0.0f,    0.0f, 0.0f,
+        0.0f,  1.0f,    0.0f, 1.0f,
+        1.0f,  0.0f,    1.0f, 0.0f,
+
+        0.0f,  1.0f,    0.0f, 1.0f,
+        1.0f,  0.0f,    1.0f, 0.0f,
+        1.0f,  1.0f,    1.0f, 1.0f
+    };
+
+    // mpv framebuffer
+    GLuint mpv_framebuffer = 0;
+    glGenFramebuffers(1, &mpv_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, mpv_framebuffer);
+    GLuint mpv_texture;
+    glGenTextures(1, &mpv_texture);
+    glBindTexture(GL_TEXTURE_2D, mpv_texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, mpv_texture, 0);
+    GLenum DrawBuffers[1] = {GL_COLOR_ATTACHMENT0};
+    glDrawBuffers(1, DrawBuffers);
+
     init_mpv();
-    mpv_play();
+    mpv_play("https://www.youtube.com/watch?v=ywjyeaMUibM");
 
     GLuint fpsTexture;
     glGenTextures( 1, &fpsTexture );
+    SDL_Rect textureSize;
+    // This will identify our vertex buffer
+    GLuint vertexbuffer;
+    // Generate 1 buffer, put the resulting identifier in vertexbuffer
+    glGenBuffers(1, &vertexbuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+
+    Shader square;
+    square.init("../shaders/vert.glsl", "../shaders/frag.glsl");
 
     fpsinit();
     bool isrunning = true;
+    bool firstFrame = true;
+    auto last_time = SDL_GetTicks();
     while (isrunning) {
         SDL_Event e;
         while (SDL_PollEvent(&e) && isrunning) {
@@ -615,67 +614,103 @@ int App::launch() {
         }
         if (!isrunning) break;
         float framespersecond = fpsupdate();
+        auto now_time = SDL_GetTicks();
         int winWidth, winHeight;
-        SDL_GetWindowSize(mainWindow, &winWidth, &winHeight);
+        SDL_GL_GetDrawableSize(mainWindow, &winWidth, &winHeight);
 
-        glViewport(0, 0, winWidth, winHeight);
-
-        std::string note = "";
-        if (!isnan(currentNote1)) {
-          note = tones[(int)(currentNote1) % 12];
+        if (firstFrame || SDL_TICKS_PASSED(now_time, last_time + 500)) {
+            std::string note = "";
+            if (!isnan(currentNote1)) {
+              note = tones[(int)(currentNote1) % 12];
+            }
+            textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond)).c_str());
+            last_time = now_time;
         }
 
-        auto textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond) + " " + note).c_str());
-        g_vertex_buffer_data[0+0*4] = 0.0f;
-        g_vertex_buffer_data[1+0*4] = 0.0f;
-        g_vertex_buffer_data[0+1*4] = 0.0f;
-        g_vertex_buffer_data[1+1*4] = textureSize.h;
-        g_vertex_buffer_data[0+2*4] = textureSize.w;
-        g_vertex_buffer_data[1+2*4] = 0.0f;
-
-        g_vertex_buffer_data[0+3*4] = 0.0f;
-        g_vertex_buffer_data[1+3*4] = textureSize.h;
-        g_vertex_buffer_data[0+4*4] = textureSize.w;
-        g_vertex_buffer_data[1+4*4] = 0.0f;
-        g_vertex_buffer_data[0+5*4] = textureSize.w;
-        g_vertex_buffer_data[1+5*4] = textureSize.h;
-
-        glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
-
-        glClearColor(0.0, 0.0, 0.0, 1.0);
+        // clean state
+        glViewport(0, 0, winWidth, winHeight);
+        glClearColor(0.0, 0.0, 0.0, 0.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        mpv_render(winWidth, winHeight, 0, 0);
+        // render mpv video frame to framebuffer
+        glBindTexture(GL_TEXTURE_2D, mpv_texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, winWidth, winHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+        mpv_render(winWidth, winHeight, mpv_framebuffer, 0);
 
+        // restore state
+        glViewport(0, 0, winWidth, winHeight);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         square.use();
-        glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, fpsTexture);
+        glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 
         glEnableVertexAttribArray(square.attribute("position"));
         glEnableVertexAttribArray(square.attribute("texcoord"));
+        glVertexAttribPointer(
+            square.attribute("position"),
+            2,                  // size
+            GL_FLOAT,           // type
+            GL_FALSE,           // normalized?
+            4 * sizeof(GLfloat),// stride
+            0                   // array buffer offset
+        );
+        glVertexAttribPointer(
+            square.attribute("texcoord"),
+            2,                  // size
+            GL_FLOAT,           // type
+            GL_FALSE,           // normalized?
+            4 * sizeof(GLfloat),// stride
+            (GLvoid*)(2 * sizeof(GLfloat)) // array buffer offset
+        );
+
         glUniform2f(square.uniform("viewportSize"), winWidth, winHeight);
         glUniform2f(square.uniform("viewOffset"), 0, 0);
-
-        glUniform4f(square.uniform("bgColor"), 1.0, 0.0, 1.0, 0.5);
+        glUniform2f(square.uniform("viewSize"), winWidth, winHeight);
+        glUniform4f(square.uniform("bgColor"), 0.0, 0.0, 0.0, 0.0);
         glUniform1f(square.uniform("textureOpacity"), 1.0);
-        glDrawArrays(GL_TRIANGLES, 0, 3*2);
+        glBindTexture(GL_TEXTURE_2D, mpv_texture);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindTexture(GL_TEXTURE_2D, fpsTexture);
 
-        glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence1);
-        glUniform2f(square.uniform("viewOffset"), 300, winHeight - currentNote1 * 40 + 50);
+        glUniform2f(square.uniform("viewSize"), textureSize.w, textureSize.h);
+
+        glUniform4f(square.uniform("bgColor"), 0.0, 0.0, 0.0, 0.3);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
         glUniform1f(square.uniform("textureOpacity"), 0.0);
-        glDrawArrays(GL_TRIANGLES, 0, 3*2);
-        glUniform4f(square.uniform("bgColor"), 1.0, 0.2, 0.0, currentConfidence2);
-        glUniform2f(square.uniform("viewOffset"), 450, winHeight - currentNote2 * 40 + 50);
-        glDrawArrays(GL_TRIANGLES, 0, 3*2);
+
+        glUniform2f(square.uniform("viewSize"), 100, 12 * 15 + 30);
+        glUniform4f(square.uniform("bgColor"), 0.0, 0.1, 0.2, 0.7);
+        glUniform2f(square.uniform("viewOffset"), 50, 50);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glUniform4f(square.uniform("bgColor"), 0.2, 0.04, 0.0, 0.7);
+        glUniform2f(square.uniform("viewOffset"), 150, 50);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glUniform2f(square.uniform("viewSize"), 100, 30);
+
+        if (currentConfidence1 >= 0.6) {
+            glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence1);
+            glUniform2f(square.uniform("viewOffset"), 50, currentNote1 * 15 + 50);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+
+        if (currentConfidence2 >= 0.6) {
+            glUniform4f(square.uniform("bgColor"), 1.0, 0.2, 0.0, currentConfidence2);
+            glUniform2f(square.uniform("viewOffset"), 150, currentNote2 * 15 + 50);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+
         glDisableVertexAttribArray(square.attribute("position"));
         glDisableVertexAttribArray(square.attribute("texcoord"));
 
         SDL_GL_SwapWindow(mainWindow);
         SDL_Delay(1);
+        mpv_flip();
+        firstFrame = false;
     }
 
     TTF_CloseFont(gFont);

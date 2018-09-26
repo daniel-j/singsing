@@ -44,13 +44,14 @@ int init_mpv() {
     }
 
     mpv_set_option_string(mpv, "terminal", "yes");
-    // mpv_set_option_string(mpv, "msg-level", "all=v");
+    mpv_set_option_string(mpv, "msg-level", "all=status");
     mpv_set_option_string(mpv, "hwdec", "auto");
     // mpv_set_option_string(mpv, "video-sync", "display-resample");
     mpv_set_option_string(mpv, "video-timing-offset", "0.0");
     mpv_set_option_string(mpv, "audio-client-name", "singsing");
     mpv_set_option_string(mpv, "video-latency-hacks", "yes");
     mpv_set_option_string(mpv, "osd-level", "0");
+    mpv_set_option_string(mpv, "panscan", "1.0"); // fill view and crop
 
     // Some minor options can only be set before mpv_initialize().
     if (mpv_initialize(mpv) < 0) {
@@ -134,14 +135,14 @@ void mpv_play(std::string videoFile, std::string audioFile) {
     }
 }
 
-void mpv_render(int width, int height, int fbo, int format) {
+void mpv_render(int width, int height, int fbo, int format, int skip_rendering) {
     mpv_opengl_fbo mpfbo{
         .fbo = fbo,
         .w = width,
         .h = height,
         .internal_format = format
     };
-    int flip_y{1};
+    int flip_y{0};
     mpv_render_param params[] = {
         // Specify the default framebuffer (0) as target. This will
         // render onto the entire screen. If you want to show the video
@@ -150,12 +151,16 @@ void mpv_render(int width, int height, int fbo, int format) {
         {MPV_RENDER_PARAM_OPENGL_FBO, &mpfbo},
         // Flip rendering (needed due to flipped GL coordinate system).
         {MPV_RENDER_PARAM_FLIP_Y, &flip_y},
-        // {MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME, &(int){0}},
+        {MPV_RENDER_PARAM_SKIP_RENDERING, &skip_rendering},
         {MPV_RENDER_PARAM_INVALID, nullptr}
     };
     // See render_gl.h on what OpenGL environment mpv expects, and
     // other API details.
     mpv_render_context_render(mpv_gl, params);
+}
+
+void mpv_flip() {
+    mpv_render_context_report_swap(mpv_gl);
 }
 
 int mpv_destroy() {
