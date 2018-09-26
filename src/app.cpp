@@ -564,9 +564,6 @@ int App::launch() {
         0.0f,  0.0f,    0.0f, 0.0f,
         0.0f,  1.0f,    0.0f, 1.0f,
         1.0f,  0.0f,    1.0f, 0.0f,
-
-        0.0f,  1.0f,    0.0f, 1.0f,
-        1.0f,  0.0f,    1.0f, 0.0f,
         1.0f,  1.0f,    1.0f, 1.0f
     };
 
@@ -643,10 +640,9 @@ int App::launch() {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         square.use();
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, fpsTexture);
+        glUniform1i(square.uniform("texture"), 0);
+        glActiveTexture(GL_TEXTURE0 + 0);
         glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-
         glEnableVertexAttribArray(square.attribute("position"));
         glEnableVertexAttribArray(square.attribute("texcoord"));
         glVertexAttribPointer(
@@ -666,42 +662,43 @@ int App::launch() {
             (GLvoid*)(2 * sizeof(GLfloat)) // array buffer offset
         );
 
+        // draw mpv video
+        glBindTexture(GL_TEXTURE_2D, mpv_texture);
         glUniform2f(square.uniform("viewportSize"), winWidth, winHeight);
         glUniform2f(square.uniform("viewOffset"), 0, 0);
         glUniform2f(square.uniform("viewSize"), winWidth, winHeight);
         glUniform4f(square.uniform("bgColor"), 0.0, 0.0, 0.0, 0.0);
         glUniform1f(square.uniform("textureOpacity"), 1.0);
-        glBindTexture(GL_TEXTURE_2D, mpv_texture);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+        // fps counter
         glBindTexture(GL_TEXTURE_2D, fpsTexture);
-
         glUniform2f(square.uniform("viewSize"), textureSize.w, textureSize.h);
-
         glUniform4f(square.uniform("bgColor"), 0.0, 0.0, 0.0, 0.3);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         glUniform1f(square.uniform("textureOpacity"), 0.0);
 
+        // bars background
         glUniform2f(square.uniform("viewSize"), 100, 12 * 15 + 30);
         glUniform4f(square.uniform("bgColor"), 0.0, 0.1, 0.2, 0.7);
         glUniform2f(square.uniform("viewOffset"), 50, 50);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         glUniform4f(square.uniform("bgColor"), 0.2, 0.04, 0.0, 0.7);
         glUniform2f(square.uniform("viewOffset"), 150, 50);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
+        // render note bars
         glUniform2f(square.uniform("viewSize"), 100, 30);
-
-        if (currentConfidence1 >= 0.6) {
-            glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence1);
+        if (currentConfidence1 >= 0.5) {
+            glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence1 * 0.5);
             glUniform2f(square.uniform("viewOffset"), 50, currentNote1 * 15 + 50);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
-
-        if (currentConfidence2 >= 0.6) {
-            glUniform4f(square.uniform("bgColor"), 1.0, 0.2, 0.0, currentConfidence2);
+        if (currentConfidence2 >= 0.5) {
+            glUniform4f(square.uniform("bgColor"), 1.0, 0.2, 0.0, currentConfidence2 * 0.5);
             glUniform2f(square.uniform("viewOffset"), 150, currentNote2 * 15 + 50);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
 
         glDisableVertexAttribArray(square.attribute("position"));
