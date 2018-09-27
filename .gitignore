@@ -71,3 +71,9 @@ Thumbs.db
 *.dll
 *.exe
 
+
+# Misc
+deps/
+prefix/
+build/
+build-*/

@@ -321,7 +321,7 @@ void App::initAudio() {
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
     instream->userdata = this;
-    instream->software_latency = 0.010; // 10 ms
+    instream->software_latency = 0.008; // 8 ms
 
     std::cout << "Software latency: " << instream->software_latency << std::endl;
 
@@ -705,7 +705,7 @@ int App::launch() {
         // macOS bug workaround
         GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
         SDL_GL_SwapWindow(mainWindow);
-        // SDL_Delay(1);
+        SDL_Delay(1);
         mpv_flip();
         firstFrame = false;
     }

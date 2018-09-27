@@ -8,6 +8,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 endif()
 
 set(CMAKE_SKIP_RPATH TRUE)
+set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/prefix")
 
 file(GLOB_RECURSE sources
     ${CMAKE_SOURCE_DIR}/src/*.cpp
@@ -19,6 +20,10 @@ file(GLOB_RECURSE headers
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 set(OpenGL_GL_PREFERENCE "GLVND")
 
+add_executable(${PROJECT_NAME} ${sources} ${headers})
+
+include_directories("${CMAKE_PREFIX_PATH}/include")
+
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 # find_package(glm REQUIRED)
@@ -28,9 +33,9 @@ find_package(SDL2_ttf REQUIRED)
 # find_package(PortAudio REQUIRED)
 find_package(aubio REQUIRED)
 find_package(SoundIo REQUIRED)
+find_package(FFmpeg REQUIRED COMPONENTS AVCODEC AVFORMAT AVUTIL AVFILTER AVDEVICE SWRESAMPLE SWSCALE)
 find_package(MPV REQUIRED)
 
-add_executable(${PROJECT_NAME} ${sources} ${headers})
 
 target_link_libraries(
     ${PROJECT_NAME}
@@ -43,5 +48,6 @@ target_link_libraries(
     ${AUBIO_LIBRARIES}
     # ${PORTAUDIO_LIBRARIES}
     ${SOUNDIO_LIBRARY}
+    ${FFMPEG_LIBRARIES}
     ${MPV_LIBRARY}
 )
