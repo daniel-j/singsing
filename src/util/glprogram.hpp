@@ -12,7 +12,18 @@
 
 class Program {
  public:
-    bool init(const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
+    ~Program() {
+        // Cleanup all the things we bound and allocated
+        GLint currentProgram;
+        GLCall(glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram));
+        if (currentProgram == shaderProgram) {
+            // disable current program if it's current
+            GLCall(glUseProgram(0));
+        }
+        GLCall(glDeleteProgram(shaderProgram));
+    }
+
+    bool load(const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
         // Generate our shader. This is similar to glGenBuffers() and glGenVertexArray()
         // except that this returns the ID
         shaderProgram = glCreateProgram();
@@ -113,13 +124,6 @@ class Program {
     }
     void setUniformui(const std::string& name, GLuint v0, GLuint v1) {
         GLCall(glUniform2ui(uniform(name), v0, v1));
-    }
-
-    ~Program() {
-        // Cleanup all the things we bound and allocated
-        GLCall(glUseProgram(0));
-
-        GLCall(glDeleteProgram(shaderProgram));
     }
 
  private:

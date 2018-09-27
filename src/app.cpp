@@ -14,6 +14,7 @@
 #include "mpv.hpp"
 #include "util/glutils.hpp"
 #include "util/glprogram.hpp"
+#include "util/glframebuffer.hpp"
 
 const int ANALYSIS_BUFFER_LENGTH = 2048;
 const int ANALYSIS_HOP_SIZE = ANALYSIS_BUFFER_LENGTH / 4;
@@ -571,21 +572,7 @@ int App::launch() {
         1.0f, 0.0f,    1.0f, 0.0f
     };
 
-    // mpv framebuffer
-    GLuint mpv_framebuffer = 0;
-    GLCall(glGenFramebuffers(1, &mpv_framebuffer));
-    GLCall(glBindFramebuffer(GL_FRAMEBUFFER, mpv_framebuffer));
-    GLuint mpv_texture;
-    GLCall(glGenTextures(1, &mpv_texture));
-    GLCall(glBindTexture(GL_TEXTURE_2D, mpv_texture));
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-    GLCall(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 0, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr));
-    GLCall(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, mpv_texture, 0));
-    // GLenum DrawBuffers[1]{GL_COLOR_ATTACHMENT0};
-    // glDrawBuffers(1, DrawBuffers);
+    Framebuffer mpv_fbo;
 
     init_mpv();
     mpv_play("https://www.youtube.com/watch?v=ywjyeaMUibM");
@@ -603,7 +590,7 @@ int App::launch() {
     GLCall(glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW));
 
     Program square;
-    square.init("../shaders/vert.glsl", "../shaders/frag.glsl");
+    square.load("../shaders/vert.glsl", "../shaders/frag.glsl");
 
     fpsinit();
     bool isrunning = true;
@@ -640,10 +627,9 @@ int App::launch() {
         GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
         // render mpv video frame to framebuffer
-        GLCall(glBindTexture(GL_TEXTURE_2D, mpv_texture));
-        GLCall(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, winWidth, winHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr));
+        mpv_fbo.resize(winWidth, winHeight);
         GLCall(glDisable(GL_CULL_FACE));
-        GLCall(mpv_render(winWidth, winHeight, mpv_framebuffer, 0));
+        GLCall(mpv_render(winWidth, winHeight, mpv_fbo.getHandle(), 0));
         GLCall(glEnable(GL_CULL_FACE));
 
         // restore state
@@ -653,7 +639,7 @@ int App::launch() {
 
         square.use();
         square.setUniformi("texture", 0);
-        GLCall(glActiveTexture(GL_TEXTURE0 + 0));
+        // GLCall(glActiveTexture(GL_TEXTURE0 + 0));
         GLCall(glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer));
         GLCall(glEnableVertexAttribArray(square.attribute("position")));
         GLCall(glEnableVertexAttribArray(square.attribute("texcoord")));
@@ -675,7 +661,7 @@ int App::launch() {
         ));
 
         // draw mpv video
-        GLCall(glBindTexture(GL_TEXTURE_2D, mpv_texture));
+        GLCall(glBindTexture(GL_TEXTURE_2D, mpv_fbo.getTexture()));
         square.setUniform("viewportSize", winWidth, winHeight);
         square.setUniform("viewOffset", 0, 0);
         square.setUniform("viewSize", winWidth, winHeight);
@@ -704,28 +690,28 @@ int App::launch() {
         square.setUniform("viewSize", 100, 30);
         if (currentConfidence1 >= 0.5) {
             square.setUniform("bgColor", 0.0, 0.5, 1.0, currentConfidence1 * 0.5);
-            square.setUniform("viewOffset", 50, currentNote1 * 15 + 50);
+            square.setUniform("viewOffset", 50, (12 - currentNote1) * 15 + 50);
             GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
         }
         if (currentConfidence2 >= 0.5) {
             square.setUniform("bgColor", 1.0, 0.2, 0.0, currentConfidence2 * 0.5);
-            square.setUniform("viewOffset", 150, currentNote2 * 15 + 50);
+            square.setUniform("viewOffset", 150, (12 - currentNote2) * 15 + 50);
             GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
         }
 
         GLCall(glDisableVertexAttribArray(square.attribute("position")));
         GLCall(glDisableVertexAttribArray(square.attribute("texcoord")));
 
+        // macOS bug workaround
+        GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
         SDL_GL_SwapWindow(mainWindow);
-        SDL_Delay(1);
+        // SDL_Delay(1);
         mpv_flip();
         firstFrame = false;
     }
 
     GLCall(glDeleteBuffers(1, &vertexbuffer));
     GLCall(glDeleteTextures(1, &fpsTexture));
-    GLCall(glDeleteTextures(1, &mpv_texture));
-    GLCall(glDeleteFramebuffers(1, &mpv_framebuffer));
 
     TTF_CloseFont(gFont);
 
