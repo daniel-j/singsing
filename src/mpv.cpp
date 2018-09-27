@@ -26,12 +26,12 @@ static void *get_proc_address_mpv(void *fn_ctx, const char *name) {
 }
 
 static void on_mpv_events(void *ctx) {
-    SDL_Event event = {.type = wakeup_on_mpv_events};
+    SDL_Event event{.type = wakeup_on_mpv_events};
     SDL_PushEvent(&event);
 }
 
 static void on_mpv_redraw(void *ctx) {
-    SDL_Event event = {.type = wakeup_on_mpv_redraw};
+    SDL_Event event{.type = wakeup_on_mpv_redraw};
     SDL_PushEvent(&event);
 }
 
@@ -59,7 +59,7 @@ int init_mpv() {
     }
 
     mpv_opengl_init_params gl_init_params{ .get_proc_address = get_proc_address_mpv };
-    mpv_render_param params[] = {
+    mpv_render_param params[]{
         {MPV_RENDER_PARAM_API_TYPE, const_cast<char *>(MPV_RENDER_API_TYPE_OPENGL)},
         {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &gl_init_params},
         {MPV_RENDER_PARAM_INVALID, nullptr}
@@ -127,7 +127,7 @@ int mpv_process_sdl_event(SDL_Event* event) {
 
 void mpv_play(std::string videoFile, std::string audioFile) {
     // Play this file. Note that this starts playback asynchronously.
-    const char *command[] = {"loadfile", videoFile.c_str(), NULL};
+    const char *command[]{"loadfile", videoFile.c_str(), NULL};
     mpv_command(mpv, command);
 
     if (!audioFile.empty()) {
@@ -143,7 +143,7 @@ void mpv_render(int width, int height, int fbo, int format, int skip_rendering) 
         .internal_format = format
     };
     int flip_y{0};
-    mpv_render_param params[] = {
+    mpv_render_param params[]{
         // Specify the default framebuffer (0) as target. This will
         // render onto the entire screen. If you want to show the video
         // in a smaller rectangle or apply fancy transformations, you'll
