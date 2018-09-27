@@ -7,13 +7,14 @@
 #include <algorithm>    // std::min
 // #include <portaudio.h>
 #include <soundio/soundio.h>
-#include "shader.hpp"
-#include <glm/glm.hpp>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include "base/ringbuffer.hpp"
 #include "util/fpscounter.hpp"
 #include "mpv.hpp"
+#include "util/glutils.hpp"
+#include "util/glprogram.hpp"
+#include "util/glframebuffer.hpp"
 
 const int ANALYSIS_BUFFER_LENGTH = 2048;
 const int ANALYSIS_HOP_SIZE = ANALYSIS_BUFFER_LENGTH / 4;
@@ -31,7 +32,8 @@ static struct SoundIo *soundio;
 static struct SoundIoDevice *in_device;
 static struct SoundIoInStream *instream;
 
-static std::string tones[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+static std::string tones[]{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
 /*
 int recordCallback(const void *inputBuffer, void *outputBuffer,
                    unsigned long framesPerBuffer,
@@ -160,11 +162,11 @@ void App::analyzeAudio(const int& channel, const float* const buffer, float* con
         channelBuffer[i] = buffer[i * 2 + channel];
     }
 
-    fvec_t out = {
+    fvec_t out{
         1,
         pitch
     };
-    fvec_t buf = {
+    fvec_t buf{
         ANALYSIS_HOP_SIZE,
         (float*)&channelBuffer
     };
@@ -184,9 +186,6 @@ void checkRingbuffer(App* app, int bytes_per_frame) {
     float threshold = 0.03f;
 
     float *read_ptr = (float*)soundio_ring_buffer_read_ptr(ring_buffer);
-    // int fill_bytes = soundio_ring_buffer_fill_count(ring_buffer);
-
-    // std::cout << fill_bytes << std::endl;
 
     // app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
     app->analyzeAudio(0, read_ptr, &pitch1, &probability1);
@@ -331,8 +330,7 @@ void App::initAudio() {
         return;
     }
 
-    // single channel
-    int capacity = instream->sample_rate * instream->bytes_per_frame * 2 * instream->software_latency;
+    int capacity = instream->bytes_per_frame * ANALYSIS_BUFFER_LENGTH;
     ring_buffer = soundio_ring_buffer_create(soundio, capacity);
     if (!ring_buffer) {
         std::cerr << "Unable to create ring buffer: Out of memory" << std::endl;
@@ -352,139 +350,13 @@ void App::initAudio() {
 
     fprintf(stderr, "%s %d Hz %s interleaved\n",
                 instream->layout.name, instream->sample_rate, soundio_format_string(instream->format));
-
-    return;
-
-#if SDL_AUDIO_DRIVER_ALSAA
-    if (SDL_AudioInit("alsa")) {
-        std::cerr << "Failed to initialize ALSA" << std::endl;
-        SDL_AudioInit(NULL);
-    }
-#endif
-
-    const char* driver_name = SDL_GetCurrentAudioDriver();
-
-    if (driver_name) {
-        printf("Audio subsystem initialized; driver = %s.\n", driver_name);
-    } else {
-        printf("Audio subsystem not initialized.\n");
-    }
-
-    /*for (int i = 0; i < SDL_GetNumAudioDrivers(); ++i) {
-        printf("Audio driver %d: %s\n", i, SDL_GetAudioDriver(i));
-    }*/
-
-    int i, count = SDL_GetNumAudioDevices(1);
-    std::cout << "Number of devices: " << count << std::endl;
-    for (i = 0; i < count; ++i) {
-        printf("Audio device %d: %s\n", i, SDL_GetAudioDeviceName(i, 1));
-    }
-
-    SDL_AudioSpec want, have;
-    SDL_zero(want);
-    want.freq = 44100;
-    want.format = AUDIO_F32;
-    want.channels = 2;
-    want.samples = 256;
-    want.callback = NULL;
-
-    auto dev = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, 1), 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
-    if (dev == 0) {
-        SDL_Log("Failed to open audio: %s", SDL_GetError());
-    } else {
-        if (have.format != want.format) { /* we let this one thing change. */
-            SDL_Log("We didn't get Float32 audio format.");
-        }
-        SDL_PauseAudioDevice(dev, 0); /* start audio playing. */
-        // SDL_Delay(5000); /* let the audio callback play some sound for 5 seconds. */
-        SDL_CloseAudioDevice(dev);
-    }
-
-    /*
-    PaError err = paNoError;
-    PaStreamParameters inputParameters, outputParameters;
-    err = Pa_Initialize();
-    if( err != paNoError ) {
-        std::cerr << "Unable to initialize PortAudio" << std::endl;
-        return;
-    }
-    std::cout << "PortAudio version: " << Pa_GetVersionText() << "" << std::endl;
-
-    auto numDevices = Pa_GetDeviceCount();
-    std::cout << "Number of devices = " << numDevices << std::endl;
-
-    auto defaultInput = Pa_GetDefaultInputDevice();
-    auto defaultOutput = Pa_GetDefaultOutputDevice();
-
-    for (int i = 0; i < numDevices; i++) {
-        auto deviceInfo = Pa_GetDeviceInfo( i );
-        std::cout << "Name: " << deviceInfo->name;
-        if (i == defaultInput) {
-            std::cout << " [Default Input]";
-        } else if( i == Pa_GetHostApiInfo( deviceInfo->hostApi )->defaultInputDevice ) {
-            const PaHostApiInfo *hostInfo = Pa_GetHostApiInfo( deviceInfo->hostApi );
-            std::cout << " [Default " << hostInfo->name << " Input]";
-        }
-        if (i == defaultOutput) {
-            std::cout << " [Default Output]";
-        } else if (i == Pa_GetHostApiInfo( deviceInfo->hostApi )->defaultOutputDevice) {
-            const PaHostApiInfo *hostInfo = Pa_GetHostApiInfo( deviceInfo->hostApi );
-            std::cout << " [Default " << hostInfo->name << " Output]";
-        }
-        std::cout << std::endl;
-        printf( "Host API: %s\n",  Pa_GetHostApiInfo( deviceInfo->hostApi )->name );
-        printf( "Max input/output channels: %d/%d\n", deviceInfo->maxInputChannels, deviceInfo->maxOutputChannels );
-
-        printf( "Default low input latency   = %8.4f\n", deviceInfo->defaultLowInputLatency  );
-        printf( "Default low output latency  = %8.4f\n", deviceInfo->defaultLowOutputLatency  );
-        printf( "Default high input latency  = %8.4f\n", deviceInfo->defaultHighInputLatency  );
-        printf( "Default high output latency = %8.4f\n", deviceInfo->defaultHighOutputLatency  );
-
-        printf( "Default sample rate:  %8.2f\n", deviceInfo->defaultSampleRate );
-    }
-
-    PaStream* stream;
-    PaStreamParameters inputParams;
-    inputParams.device = defaultInput; // default input device
-    auto deviceInfo = Pa_GetDeviceInfo( inputParams.device );
-    inputParams.channelCount = 2; // stereo input
-    inputParams.sampleFormat = paFloat32|paNonInterleaved; // float
-    inputParams.suggestedLatency = (deviceInfo->defaultSampleRate/(float)ANALYSIS_BUFFER_LENGTH)/1000.0 + 0.01;//Pa_GetDeviceInfo( inputParams.device )->defaultHighInputLatency;
-    inputParams.hostApiSpecificStreamInfo = NULL;
-
-    err = Pa_OpenStream(
-        &stream,
-        &inputParams,
-        NULL,
-        deviceInfo->defaultSampleRate,
-        ANALYSIS_BUFFER_LENGTH,
-        paNoFlag,
-        recordCallback,
-        this);
-    if ( err != paNoError ) {
-        std::cerr << "Unable to open input stream" << std::endl;
-    }
-    yinChannels = new Yin[inputParams.channelCount];
-    aubioPitchChannels = (aubio_pitch_t **)malloc(sizeof(aubio_pitch_t *) * inputParams.channelCount);
-    for (int channel = 0; channel < inputParams.channelCount; ++channel) {
-        yinChannels[channel].initialize(deviceInfo->defaultSampleRate, ANALYSIS_BUFFER_LENGTH, 0.9);
-        aubioPitchChannels[channel] = new_aubio_pitch((char*)"yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_BUFFER_LENGTH / 2, deviceInfo->defaultSampleRate);
-    }
-    err = Pa_StartStream(stream);
-    if ( err != paNoError ) {
-        std::cerr << "Unable to start input stream" << std::endl;
-    }
-    */
 }
 
-SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, uint8_t r, uint8_t g, uint8_t b, const char* text ) {
-    SDL_Color fg = { r, g, b, 255 };
-    auto s1 = TTF_RenderText_Blended(font, text, fg);
+SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, SDL_Color color, const std::string &text ) {
+    auto s1 = TTF_RenderUTF8_Blended(font, text.c_str(), color);
     auto s2 = SDL_ConvertSurfaceFormat(s1, SDL_PIXELFORMAT_RGBA32, 0);
-    SDL_FreeSurface( s1 );
 
     glBindTexture( GL_TEXTURE_2D, tex );
-
     // disable mipmapping on the new texture
     glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
     glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
@@ -492,18 +364,18 @@ SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, uint8_t r, uint8_t g, uint8_
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
     glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, s2->w, s2->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, s2->pixels );
 
-    SDL_FreeSurface( s2 );
     glBindTexture(GL_TEXTURE_2D, 0);
-    SDL_Rect rect = {0, 0, s2->w, s2->h};
+    SDL_Rect rect{0, 0, s2->w, s2->h};
+    SDL_FreeSurface(s1);
+    SDL_FreeSurface(s2);
     return rect;
 }
 
 void ImageToTexture( GLuint tex, const char* imgpath ) {
     SDL_Surface* s1 = IMG_Load( imgpath );
     auto s2 = SDL_ConvertSurfaceFormat(s1, SDL_PIXELFORMAT_RGBA32, 0);
-    SDL_FreeSurface( s1 );
-    glBindTexture( GL_TEXTURE_2D, tex );
 
+    glBindTexture( GL_TEXTURE_2D, tex );
     // disable mipmapping on the new texture
     glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
     glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
@@ -511,8 +383,9 @@ void ImageToTexture( GLuint tex, const char* imgpath ) {
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
     glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, s2->w, s2->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, s2->pixels );
 
-    SDL_FreeSurface( s2 );
     glBindTexture(GL_TEXTURE_2D, 0);
+    SDL_FreeSurface( s1 );
+    SDL_FreeSurface( s2 );
 }
 
 App::App() {
@@ -551,18 +424,16 @@ int App::init() {
         return 1;
     }
 
-    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    // SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
     mainWindow = SDL_CreateWindow("singsing",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        1280, 720,
-        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+        640, 360,
+        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE/*|SDL_WINDOW_ALLOW_HIGHDPI*/);
     if (!mainWindow) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -577,27 +448,32 @@ int App::init() {
     SDL_GL_SetSwapInterval(1);
 
     glewExperimental = GL_TRUE;
-    glewInit();
+    if (GLenum err = glewInit() != GLEW_OK) {
+        std::cerr << "GLEW Error: " << glewGetErrorString(err) << std::endl;
+        return 1;
+    }
 
-    std::cout << "GL_VERSION " << glGetString(GL_VERSION) << std::endl <<
-                 "GL_RENDERER " << glGetString(GL_RENDERER) << std::endl;
+    std::cout << "GL_VENDOR " << glGetString(GL_VENDOR) << std::endl <<
+                 "GL_VERSION " << glGetString(GL_VERSION) << std::endl <<
+                 "GL_RENDERER " << glGetString(GL_RENDERER) << std::endl <<
+                 "GLSL_VERSION " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 
-    glDepthMask( GL_FALSE );
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    GLCall(glEnable(GL_CULL_FACE));
+    GLCall(glDepthMask(GL_FALSE));
+    GLCall(glEnable(GL_BLEND));
+    GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+    GLCall(glClearColor(0.0, 0.0, 0.0, 0.0));
+    GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
     SDL_GL_SwapWindow(mainWindow);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    init_mpv();
+    GLCall(glClearColor(0.0, 0.0, 0.0, 0.0));
+    GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
     return 0;
 }
 
 int App::launch() {
 
+    /*
     auto path = "../notes.txt";
 
     std::ifstream filein(path);
@@ -667,51 +543,17 @@ int App::launch() {
         std::cerr << "Lyrics/Notes missing" << std::endl;
         return 0;
     }
-
-    Shader square;
-    square.init("../shaders/vert.glsl", "../shaders/frag.glsl");
-
-    GLfloat g_vertex_buffer_data[] = {
-         0.0f,   0.0f,    0.0f, 0.0f,
-         0.0f,  50.0f,    0.0f, 1.0f,
-       200.0f,   0.0f,    1.0f, 0.0f,
-
-       -1.0f,  1.0f,    0.0f, 1.0f,
-        1.0f, -1.0f,    1.0f, 0.0f,
-       -1.0f, -1.0f,    1.0f, 1.0f,
-    };
-
-    // This will identify our vertex buffer
-    GLuint vertexbuffer;
-    // Generate 1 buffer, put the resulting identifier in vertexbuffer
-    glGenBuffers(1, &vertexbuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-    glVertexAttribPointer(
-        square.attribute("position"),
-        2,                  // size
-        GL_FLOAT,           // type
-        GL_FALSE,           // normalized?
-        4 * sizeof(GLfloat),// stride
-        0                   // array buffer offset
-    );
-    glVertexAttribPointer(
-        square.attribute("texcoord"),
-        2,                  // size
-        GL_FLOAT,           // type
-        GL_FALSE,           // normalized?
-        4 * sizeof(GLfloat),// stride
-        (GLvoid*)(2 * sizeof(GLfloat)) // array buffer offset
-    );
+    */
 
 #ifdef __linux__
-    auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 48);
+    auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 18);
     if (!gFont) {
-        gFont = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48);
+        gFont = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18);
     }
 #elif __APPLE__
-    auto gFont = TTF_OpenFont("/Library/Fonts/Arial.ttf", 48);
+    auto gFont = TTF_OpenFont("/Library/Fonts/Arial.ttf", 18);
 #elif _WIN32
-    auto gFont = TTF_OpenFont("C:\\Windows\\Fonts\\arial.ttf", 48);
+    auto gFont = TTF_OpenFont("C:\\Windows\\Fonts\\arial.ttf", 18);
 #endif
 
     if (!gFont) {
@@ -719,13 +561,41 @@ int App::launch() {
         return 1;
     }
 
+    GLfloat g_vertex_buffer_data[]{
+        // vertices    // uv
+        0.0f, 0.0f,    0.0f, 0.0f,
+        0.0f, 1.0f,    0.0f, 1.0f,
+        1.0f, 0.0f,    1.0f, 0.0f,
+
+        0.0f, 1.0f,    0.0f, 1.0f,
+        1.0f, 1.0f,    1.0f, 1.0f,
+        1.0f, 0.0f,    1.0f, 0.0f
+    };
+
+    Framebuffer mpv_fbo;
+
+    init_mpv();
     mpv_play("https://www.youtube.com/watch?v=ywjyeaMUibM");
 
+    SDL_Color textColor{255, 255, 255, 255};
     GLuint fpsTexture;
-    glGenTextures( 1, &fpsTexture );
+    GLCall(glGenTextures(1, &fpsTexture));
+    SDL_Rect textureSize;
+
+    // This will identify our vertex buffer
+    GLuint vertexbuffer;
+    // Generate 1 buffer, put the resulting identifier in vertexbuffer
+    GLCall(glGenBuffers(1, &vertexbuffer));
+    GLCall(glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer));
+    GLCall(glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW));
+
+    Program square;
+    square.load("../shaders/vert.glsl", "../shaders/frag.glsl");
 
     fpsinit();
     bool isrunning = true;
+    bool firstFrame = true;
+    auto last_time = SDL_GetTicks();
     while (isrunning) {
         SDL_Event e;
         while (SDL_PollEvent(&e) && isrunning) {
@@ -737,68 +607,111 @@ int App::launch() {
         }
         if (!isrunning) break;
         float framespersecond = fpsupdate();
+        auto now_time = SDL_GetTicks();
         int winWidth, winHeight;
-        SDL_GetWindowSize(mainWindow, &winWidth, &winHeight);
+        SDL_GL_GetDrawableSize(mainWindow, &winWidth, &winHeight);
 
-        glViewport(0, 0, winWidth, winHeight);
-
-        std::string note = "";
-        if (!isnan(currentNote1)) {
-          note = tones[(int)(currentNote1) % 12];
+        if (firstFrame || SDL_TICKS_PASSED(now_time, last_time + 500)) {
+            std::string note = "";
+            if (!isnan(currentNote1)) {
+              note = tones[(int)(currentNote1) % 12];
+            }
+            textureSize = TextToTexture(fpsTexture, gFont, textColor, (std::string("FPS: ") + std::to_string((int)framespersecond)).c_str());
+            last_time = now_time;
+            // std::cout << textureSize.w << std::endl;
         }
 
-        auto textureSize = TextToTexture(fpsTexture, gFont, 255, 255, 255, (std::string("FPS: ") + std::to_string((int)framespersecond) + " " + note).c_str());
-        g_vertex_buffer_data[0+0*4] = 0.0f;
-        g_vertex_buffer_data[1+0*4] = 0.0f;
-        g_vertex_buffer_data[0+1*4] = 0.0f;
-        g_vertex_buffer_data[1+1*4] = textureSize.h;
-        g_vertex_buffer_data[0+2*4] = textureSize.w;
-        g_vertex_buffer_data[1+2*4] = 0.0f;
+        // clean state
+        GLCall(glViewport(0, 0, winWidth, winHeight));
+        GLCall(glClearColor(0.0, 0.0, 0.0, 0.0));
+        GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
-        g_vertex_buffer_data[0+3*4] = 0.0f;
-        g_vertex_buffer_data[1+3*4] = textureSize.h;
-        g_vertex_buffer_data[0+4*4] = textureSize.w;
-        g_vertex_buffer_data[1+4*4] = 0.0f;
-        g_vertex_buffer_data[0+5*4] = textureSize.w;
-        g_vertex_buffer_data[1+5*4] = textureSize.h;
+        // render mpv video frame to framebuffer
+        mpv_fbo.resize(winWidth, winHeight);
+        GLCall(glDisable(GL_CULL_FACE));
+        GLCall(mpv_render(winWidth, winHeight, mpv_fbo.getHandle(), 0));
+        GLCall(glEnable(GL_CULL_FACE));
 
-        glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
-
-        glClearColor(0.0, 0.0, 0.0, 1.0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        mpv_render(winWidth, winHeight);
-
-        glEnable(GL_BLEND);
+        // restore state
+        GLCall(glViewport(0, 0, winWidth, winHeight));
+        GLCall(glEnable(GL_BLEND));
+        GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
         square.use();
+        square.setUniformi("texture", 0);
+        // GLCall(glActiveTexture(GL_TEXTURE0 + 0));
+        GLCall(glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer));
+        GLCall(glEnableVertexAttribArray(square.attribute("position")));
+        GLCall(glEnableVertexAttribArray(square.attribute("texcoord")));
+        GLCall(glVertexAttribPointer(
+            square.attribute("position"),
+            2,                  // size
+            GL_FLOAT,           // type
+            GL_FALSE,           // normalized?
+            4 * sizeof(GLfloat),// stride
+            0                   // array buffer offset
+        ));
+        GLCall(glVertexAttribPointer(
+            square.attribute("texcoord"),
+            2,                  // size
+            GL_FLOAT,           // type
+            GL_FALSE,           // normalized?
+            4 * sizeof(GLfloat),// stride
+            (GLvoid*)(2 * sizeof(GLfloat)) // array buffer offset
+        ));
 
-        glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+        // draw mpv video
+        GLCall(glBindTexture(GL_TEXTURE_2D, mpv_fbo.getTexture()));
+        square.setUniform("viewportSize", winWidth, winHeight);
+        square.setUniform("viewOffset", 0, 0);
+        square.setUniform("viewSize", winWidth, winHeight);
+        square.setUniform("bgColor", 0.0, 0.0, 0.0, 0.0);
+        square.setUniform("textureOpacity", 1.0);
+        GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
 
-        glEnableVertexAttribArray(square.attribute("position"));
-        glEnableVertexAttribArray(square.attribute("texcoord"));
-        glUniform2f(square.uniform("viewportSize"), winWidth, winHeight);
-        glUniform2f(square.uniform("viewOffset"), 0, 0);
-        glUniform4f(square.uniform("bgColor"), 1.0, 0.0, 1.0, 0.5);
-        glUniform1f(square.uniform("textureOpacity"), 1.0);
-        glBindTexture(GL_TEXTURE_2D, fpsTexture);
+        // fps counter
+        GLCall(glBindTexture(GL_TEXTURE_2D, fpsTexture));
+        square.setUniform("viewSize", textureSize.w, textureSize.h);
+        square.setUniform("bgColor", 0.0, 0.0, 0.0, 0.3);
+        GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
 
-        glDrawArrays(GL_TRIANGLES, 0, 3*2);
+        square.setUniform("textureOpacity", 0.0);
 
-        glUniform4f(square.uniform("bgColor"), 0.0, 0.5, 1.0, currentConfidence1);
-        glUniform2f(square.uniform("viewOffset"), 300, winHeight - currentNote1 * 40 + 50);
-        glUniform1f(square.uniform("textureOpacity"), 0.0);
-        glDrawArrays(GL_TRIANGLES, 0, 3*2);
-        glUniform4f(square.uniform("bgColor"), 1.0, 0.2, 0.0, currentConfidence2);
-        glUniform2f(square.uniform("viewOffset"), 600, winHeight - currentNote2 * 40 + 50);
-        glDrawArrays(GL_TRIANGLES, 0, 3*2);
-        glDisableVertexAttribArray(square.attribute("position"));
-        glDisableVertexAttribArray(square.attribute("texcoord"));
+        // bars background
+        square.setUniform("viewSize", 100, 12 * 15 + 30);
+        square.setUniform("bgColor", 0.0, 0.1, 0.2, 0.7);
+        square.setUniform("viewOffset", 50, 50);
+        GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
+        square.setUniform("bgColor", 0.2, 0.04, 0.0, 0.7);
+        square.setUniform("viewOffset", 150, 50);
+        GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
 
+        // render note bars
+        square.setUniform("viewSize", 100, 30);
+        if (currentConfidence1 >= 0.5) {
+            square.setUniform("bgColor", 0.0, 0.5, 1.0, currentConfidence1 * 0.5);
+            square.setUniform("viewOffset", 50, (12 - currentNote1) * 15 + 50);
+            GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
+        }
+        if (currentConfidence2 >= 0.5) {
+            square.setUniform("bgColor", 1.0, 0.2, 0.0, currentConfidence2 * 0.5);
+            square.setUniform("viewOffset", 150, (12 - currentNote2) * 15 + 50);
+            GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
+        }
+
+        GLCall(glDisableVertexAttribArray(square.attribute("position")));
+        GLCall(glDisableVertexAttribArray(square.attribute("texcoord")));
+
+        // macOS bug workaround
+        GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
         SDL_GL_SwapWindow(mainWindow);
-        SDL_Delay(1);
+        // SDL_Delay(1);
+        mpv_flip();
+        firstFrame = false;
     }
+
+    GLCall(glDeleteBuffers(1, &vertexbuffer));
+    GLCall(glDeleteTextures(1, &fpsTexture));
 
     TTF_CloseFont(gFont);
 

@@ -1,4 +1,5 @@
 
+#include <iostream>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,16 +7,17 @@
 
 #include <SDL2/SDL.h>
 
+#include "mpv.hpp"
+
 #include <mpv/client.h>
 #include <mpv/render_gl.h>
 
 static Uint32 wakeup_on_mpv_redraw, wakeup_on_mpv_events;
 static mpv_handle *mpv = nullptr;
 static mpv_render_context *mpv_gl = nullptr;
-static int redraw = 1;
 
-static void die(const char *msg) {
-    fprintf(stderr, "%s\n", msg);
+static void die(const std::string& msg) {
+    std::cerr << msg << std::endl;
     exit(1);
 }
 
@@ -24,12 +26,12 @@ static void *get_proc_address_mpv(void *fn_ctx, const char *name) {
 }
 
 static void on_mpv_events(void *ctx) {
-    SDL_Event event = {.type = wakeup_on_mpv_events};
+    SDL_Event event{.type = wakeup_on_mpv_events};
     SDL_PushEvent(&event);
 }
 
 static void on_mpv_redraw(void *ctx) {
-    SDL_Event event = {.type = wakeup_on_mpv_redraw};
+    SDL_Event event{.type = wakeup_on_mpv_redraw};
     SDL_PushEvent(&event);
 }
 
@@ -42,24 +44,25 @@ int init_mpv() {
     }
 
     mpv_set_option_string(mpv, "terminal", "yes");
-    // mpv_set_option_string(mpv, "msg-level", "all=v");
+    mpv_set_option_string(mpv, "msg-level", "all=status");
     mpv_set_option_string(mpv, "hwdec", "auto");
     // mpv_set_option_string(mpv, "video-sync", "display-resample");
     mpv_set_option_string(mpv, "video-timing-offset", "0.0");
+    mpv_set_option_string(mpv, "audio-client-name", "singsing");
+    mpv_set_option_string(mpv, "video-latency-hacks", "yes");
+    mpv_set_option_string(mpv, "osd-level", "0");
+    mpv_set_option_string(mpv, "panscan", "1.0"); // fill view and crop
 
     // Some minor options can only be set before mpv_initialize().
     if (mpv_initialize(mpv) < 0) {
         die("mpv init failed");
     }
 
-    mpv_opengl_init_params initparams = {
-        .get_proc_address = get_proc_address_mpv,
-    };
-
-    mpv_render_param params[] = {
-        {MPV_RENDER_PARAM_API_TYPE, (void*)MPV_RENDER_API_TYPE_OPENGL},
-        {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &initparams},
-        {(mpv_render_param_type)0}
+    mpv_opengl_init_params gl_init_params{ .get_proc_address = get_proc_address_mpv };
+    mpv_render_param params[]{
+        {MPV_RENDER_PARAM_API_TYPE, const_cast<char *>(MPV_RENDER_API_TYPE_OPENGL)},
+        {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &gl_init_params},
+        {MPV_RENDER_PARAM_INVALID, nullptr}
     };
 
     // This makes mpv use the currently set GL context. It will use the callback
@@ -93,7 +96,6 @@ int mpv_process_sdl_event(SDL_Event* event) {
     switch (event->type) {
     case SDL_WINDOWEVENT:
         if (event->window.event == SDL_WINDOWEVENT_EXPOSED) {
-            redraw = 1;
         }
         break;
     case SDL_KEYDOWN:
@@ -105,7 +107,6 @@ int mpv_process_sdl_event(SDL_Event* event) {
         // Happens when a new video frame should be rendered, or if the
         // current frame has to be redrawn e.g. due to OSD changes.
         if (event->type == wakeup_on_mpv_redraw) {
-            redraw = 1;
         }
         // Happens when at least 1 new event is in the mpv event queue.
         else if (event->type == wakeup_on_mpv_events) {
@@ -126,7 +127,7 @@ int mpv_process_sdl_event(SDL_Event* event) {
 
 void mpv_play(std::string videoFile, std::string audioFile) {
     // Play this file. Note that this starts playback asynchronously.
-    const char *command[] = {"loadfile", videoFile.c_str(), NULL};
+    const char *command[]{"loadfile", videoFile.c_str(), NULL};
     mpv_command(mpv, command);
 
     if (!audioFile.empty()) {
@@ -134,32 +135,32 @@ void mpv_play(std::string videoFile, std::string audioFile) {
     }
 }
 
-void mpv_render(int width, int height) {
-    redraw = 1;
+void mpv_render(int width, int height, int fbo, int format, int skip_rendering) {
+    mpv_opengl_fbo mpfbo{
+        .fbo = fbo,
+        .w = width,
+        .h = height,
+        .internal_format = format
+    };
+    int flip_y{0};
+    mpv_render_param params[]{
+        // Specify the default framebuffer (0) as target. This will
+        // render onto the entire screen. If you want to show the video
+        // in a smaller rectangle or apply fancy transformations, you'll
+        // need to render into a separate FBO and draw it manually.
+        {MPV_RENDER_PARAM_OPENGL_FBO, &mpfbo},
+        // Flip rendering (needed due to flipped GL coordinate system).
+        {MPV_RENDER_PARAM_FLIP_Y, &flip_y},
+        {MPV_RENDER_PARAM_SKIP_RENDERING, &skip_rendering},
+        {MPV_RENDER_PARAM_INVALID, nullptr}
+    };
+    // See render_gl.h on what OpenGL environment mpv expects, and
+    // other API details.
+    mpv_render_context_render(mpv_gl, params);
+}
 
-    if (redraw) {
-        mpv_opengl_fbo fboinfo = {
-            .fbo = 0,
-            .w = width,
-            .h = height,
-        };
-        int flip_y = 1;
-        mpv_render_param params[] = {
-            // Specify the default framebuffer (0) as target. This will
-            // render onto the entire screen. If you want to show the video
-            // in a smaller rectangle or apply fancy transformations, you'll
-            // need to render into a separate FBO and draw it manually.
-            {MPV_RENDER_PARAM_OPENGL_FBO, &fboinfo},
-            // Flip rendering (needed due to flipped GL coordinate system).
-            {MPV_RENDER_PARAM_FLIP_Y, &flip_y},
-            // {MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME, &(int){0}},
-            {(mpv_render_param_type)0}
-        };
-        // See render_gl.h on what OpenGL environment mpv expects, and
-        // other API details.
-        mpv_render_context_render(mpv_gl, params);
-        redraw = 0;
-    }
+void mpv_flip() {
+    mpv_render_context_report_swap(mpv_gl);
 }
 
 int mpv_destroy() {
