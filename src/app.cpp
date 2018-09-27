@@ -273,10 +273,10 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
         }
     }
 
-    int advance_bytes = write_frames * instream->bytes_per_sample;
+    int advance_bytes = write_frames * instream->bytes_per_frame;
     soundio_ring_buffer_advance_write_ptr(ring_buffer, advance_bytes);
 
-    //std::cout << advance_bytes / instream->bytes_per_frame << " " << soundio_ring_buffer_fill_count(ring_buffer) / instream->bytes_per_frame << ">=" << ANALYSIS_HOP_SIZE << " ";
+    //std::cout << write_frames << " " << soundio_ring_buffer_fill_count(ring_buffer) / instream->bytes_per_frame << ">=" << ANALYSIS_HOP_SIZE << " ";
 
     while (soundio_ring_buffer_fill_count(ring_buffer) >= ANALYSIS_HOP_SIZE * instream->bytes_per_frame) {
         //std::cout << "analyze ";
@@ -316,7 +316,7 @@ void App::initAudio() {
     instream = soundio_instream_create(in_device);
 
     instream->name = "Input #1";
-    instream->sample_rate = soundio_device_nearest_sample_rate(in_device, 48000);
+    instream->sample_rate = soundio_device_nearest_sample_rate(in_device, 44100);
     instream->format = SoundIoFormatFloat32NE;
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
@@ -473,6 +473,7 @@ int App::init() {
 
 int App::launch() {
 
+    /*
     auto path = "../notes.txt";
 
     std::ifstream filein(path);
@@ -480,7 +481,6 @@ int App::launch() {
     auto finishedHeaders = false;
     auto endFound = false;
 
-    /*
     for (std::string line; std::getline(filein, line); ) {
         if (!line.empty() && *line.rbegin() == '\r') {
             line.erase( line.length() - 1, 1);
