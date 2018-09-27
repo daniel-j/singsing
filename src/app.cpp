@@ -340,7 +340,7 @@ void App::initAudio() {
     aubioPitchChannels = (aubio_pitch_t **)malloc(sizeof(aubio_pitch_t *) * instream->layout.channel_count);
     // yinChannels = new Yin[instream->layout.channel_count];
     for (int channel = 0; channel < instream->layout.channel_count; ++channel) {
-        aubioPitchChannels[channel] = new_aubio_pitch((char*)"yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_HOP_SIZE, instream->sample_rate);
+        aubioPitchChannels[channel] = new_aubio_pitch((char*)"yinfast", ANALYSIS_BUFFER_LENGTH, ANALYSIS_HOP_SIZE, instream->sample_rate);
         // yinChannels[channel].initialize(instream->sample_rate, ANALYSIS_BUFFER_LENGTH, 1.0);
     }
 

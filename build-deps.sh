@@ -162,6 +162,15 @@ build_mpv() {
 	./waf distclean
 }
 
+build_aubio() {
+	echo "Building Aubio"
+	cd "$SRC/aubio"
+	PKG_CONFIG_PATH="$PKG_CONFIG_PATH" python waf configure --prefix="$PREFIX"
+	python waf build $makearg
+	python waf install
+	python waf distclean
+}
+
 build_portmidi() {
 	echo "Building PortMidi"
 	cd "$SRC"
@@ -227,6 +236,8 @@ if [ "$1" == "all" ]; then
 	build_ffmpeg
 
 	build_mpv
+
+	build_aubio
 
 	#build_portmidi
 

@@ -36,7 +36,6 @@ find_package(SoundIo REQUIRED)
 find_package(FFmpeg REQUIRED COMPONENTS AVCODEC AVFORMAT AVUTIL AVFILTER AVDEVICE SWRESAMPLE SWSCALE)
 find_package(MPV REQUIRED)
 
-
 target_link_libraries(
     ${PROJECT_NAME}
     ${OPENGL_LIBRARIES}
