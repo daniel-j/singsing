@@ -5,7 +5,7 @@ set -e
 declare -a deps
 deps+=('yasm,http://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz')
 deps+=('ffmpeg,https://www.ffmpeg.org/releases/ffmpeg-4.0.2.tar.xz')
-deps+=('mpv,https://github.com/mpv-player/mpv/archive/v0.29.0.tar.gz')
+deps+=('mpv,https://github.com/daniel-j/mpv/archive/ao_cb.tar.gz')
 deps+=('aubio,https://aubio.org/pub/aubio-0.4.7.tar.bz2')
 deps+=('libcwrap.h,https://raw.githubusercontent.com/wheybags/glibc_version_header/master/version_headers/force_link_glibc_2.10.2.h')
 

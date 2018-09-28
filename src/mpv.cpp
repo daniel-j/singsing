@@ -52,6 +52,10 @@ int init_mpv() {
     mpv_set_option_string(mpv, "video-latency-hacks", "yes");
     mpv_set_option_string(mpv, "osd-level", "0");
     mpv_set_option_string(mpv, "panscan", "1.0"); // fill view and crop
+    //mpv_set_option_string(mpv, "ao", "libmpv");
+    //mpv_set_option_string(mpv, "ao-libmpv-format", "float32");
+    //mpv_set_option_string(mpv, "ao-libmpv-samplerate", "44100");
+    //mpv_set_option_string(mpv, "ao-libmpv-channel-layouts", "stereo");
 
     // Some minor options can only be set before mpv_initialize().
     if (mpv_initialize(mpv) < 0) {
@@ -161,6 +165,16 @@ void mpv_render(int width, int height, int fbo, int format, int skip_rendering) 
 
 void mpv_flip() {
     mpv_render_context_report_swap(mpv_gl);
+}
+
+double mpv_progress() {
+    double progress = 0.0;
+    mpv_get_property(mpv, "percent-pos", MPV_FORMAT_DOUBLE, &progress);
+    return progress / 100.0;
+}
+
+int mpv_read_audio(void* buffer, int length) {
+    return mpv_audio_callback(mpv, buffer, length);
 }
 
 int mpv_destroy() {

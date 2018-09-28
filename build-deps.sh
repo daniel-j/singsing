@@ -153,13 +153,14 @@ build_mpv() {
 	cd "$SRC/mpv"
 	./bootstrap.py
 	PKG_CONFIG_PATH="$PKG_CONFIG_PATH" ./waf configure --prefix="$PREFIX" --disable-cplayer --enable-libmpv-shared \
-		--disable-manpage-build --disable-android --disable-lua --disable-javascript \
+		--disable-manpage-build --disable-android --disable-javascript \
 		--disable-libass --disable-libass-osd --disable-libbluray \
 		--disable-vapoursynth --disable-vapoursynth-lazy --disable-libarchive \
 		--disable-oss-audio --disable-rsound \
 		--disable-tv-v4l2 --disable-libv4l2 --disable-audio-input \
-		--disable-apple-remote --disable-macos-touchbar --disable-macos-cocoa-cb
-	./waf $makearg
+		--disable-apple-remote --disable-macos-touchbar --disable-macos-cocoa-cb \
+		--disable-lua # ythook
+	./waf build $makearg
 	./waf install
 	./waf distclean
 }

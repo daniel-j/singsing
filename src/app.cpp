@@ -31,6 +31,9 @@ static float currentConfidence2 = 0.0;
 static struct SoundIo *soundio;
 static struct SoundIoDevice *in_device;
 static struct SoundIoInStream *instream;
+static struct SoundIoDevice *out_device;
+static struct SoundIoOutStream *outstream;
+static std::vector<float> mpv_audio_buffer;
 
 static std::string tones[]{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -214,7 +217,7 @@ void checkRingbuffer(App* app, int bytes_per_frame) {
     //fflush(stdout);
 }
 
-void read_callback(struct SoundIoInStream *instream, int frame_count_min, int frame_count_max) {
+static void read_callback(struct SoundIoInStream *instream, int frame_count_min, int frame_count_max) {
     auto app = (App*)instream->userdata;
     struct SoundIoChannelArea *areas;
 
@@ -285,9 +288,60 @@ void read_callback(struct SoundIoInStream *instream, int frame_count_min, int fr
     //std::cout << std::endl;
 }
 
-void overflow_callback(struct SoundIoInStream *instream) {
+
+static void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max) {
+    struct SoundIoChannelArea *areas;
+    int err;
+
+    int frames_left = frame_count_max;
+
+    mpv_audio_buffer.resize(frames_left * outstream->layout.channel_count);
+
+    int mpv_frames = mpv_read_audio((void*)mpv_audio_buffer.data(), frames_left * outstream->bytes_per_frame);
+
+    for (;;) {
+        int frame_count = frames_left;
+        if ((err = soundio_outstream_begin_write(outstream, &areas, &frame_count))) {
+            fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
+            exit(1);
+        }
+
+        if (!frame_count) {
+            break;
+        }
+
+        const struct SoundIoChannelLayout *layout = &outstream->layout;
+
+        for (int frame = 0; frame < frame_count; frame += 1) {
+            for (int channel = 0; channel < layout->channel_count; channel += 1) {
+                float sample = mpv_audio_buffer[frame * layout->channel_count + channel];
+                float *buf = (float *)areas[channel].ptr;
+                *buf = sample;
+                areas[channel].ptr += areas[channel].step;
+            }
+        }
+
+        if ((err = soundio_outstream_end_write(outstream))) {
+            if (err == SoundIoErrorUnderflow)
+                return;
+            fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
+            exit(1);
+        }
+
+        frames_left -= frame_count;
+        if (frames_left <= 0) {
+            break;
+        }
+    }
+}
+
+static void overflow_callback(struct SoundIoInStream *instream) {
     static int count = 0;
     fprintf(stderr, "overflow %d\n", ++count);
+}
+static void underflow_callback(struct SoundIoOutStream *outstream) {
+    static int count = 0;
+    fprintf(stderr, "underflow %d\n", ++count);
 }
 
 void App::initAudio() {
@@ -350,6 +404,32 @@ void App::initAudio() {
 
     fprintf(stderr, "%s %d Hz %s interleaved\n",
                 instream->layout.name, instream->sample_rate, soundio_format_string(instream->format));
+
+
+    int default_output = soundio_default_output_device_index(soundio);
+    out_device = soundio_get_output_device(soundio, default_output);
+    printf("Output device: %s\n", out_device->name);
+
+    if (out_device->probe_error) {
+        fprintf(stderr, "Cannot probe device: %s\n", soundio_strerror(out_device->probe_error));
+    }
+
+    soundio_device_sort_channel_layouts(out_device);
+
+    outstream = soundio_outstream_create(out_device);
+
+    outstream->name = soundio->app_name;
+    outstream->sample_rate = soundio_device_nearest_sample_rate(out_device, 44100);
+    outstream->format = SoundIoFormatFloat32NE;
+    outstream->layout = *soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdStereo);
+    outstream->write_callback = write_callback;
+    outstream->underflow_callback = underflow_callback;
+    outstream->userdata = this;
+    // outstream->software_latency = 0.200; // 200 ms
+
+    if ((err = soundio_outstream_open(outstream))) {
+        fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
+    }
 }
 
 SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, SDL_Color color, const std::string &text ) {
@@ -392,6 +472,8 @@ App::App() {
 
 }
 App::~App() {
+    soundio_instream_pause(instream, true);
+    soundio_outstream_pause(outstream, true);
     mpv_destroy();
     if (glctx) SDL_GL_DeleteContext(glctx);
     if (renderer) SDL_DestroyRenderer(renderer);
@@ -402,6 +484,8 @@ App::~App() {
     // soundio_ring_buffer_destroy(ring_buffer);
     soundio_instream_destroy(instream);
     soundio_device_unref(in_device);
+    soundio_outstream_destroy(outstream);
+    soundio_device_unref(out_device);
     soundio_destroy(soundio);
     if (yinChannels) delete[] yinChannels;
     if (aubioPitchChannels) {
@@ -577,6 +661,11 @@ int App::launch() {
     init_mpv();
     mpv_play("https://www.youtube.com/watch?v=ywjyeaMUibM");
 
+    int err;
+    /*if ((err = soundio_outstream_start(outstream))) {
+        fprintf(stderr, "unable to start output device: %s\n", soundio_strerror(err));
+    }*/
+
     SDL_Color textColor{255, 255, 255, 255};
     GLuint fpsTexture;
     GLCall(glGenTextures(1, &fpsTexture));
@@ -676,6 +765,15 @@ int App::launch() {
         GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
 
         square.setUniform("textureOpacity", 0.0);
+
+        auto progress = mpv_progress();
+        square.setUniform("viewSize", winWidth, 15);
+        square.setUniform("viewOffset", 0, winHeight - 15);
+        square.setUniform("bgColor", 0.0, 0.0, 0.0, 0.3);
+        GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
+        square.setUniform("viewSize", winWidth * progress, 15);
+        square.setUniform("bgColor", 1.0, 1.0, 1.0, 0.8);
+        GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
 
         // bars background
         square.setUniform("viewSize", 100, 12 * 15 + 30);
