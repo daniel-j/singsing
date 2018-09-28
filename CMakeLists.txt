@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 2.8)
-set (CMAKE_CXX_STANDARD 11)
+cmake_minimum_required(VERSION 3.2)
+set(CMAKE_CXX_STANDARD 11)
 
 project(singsingplayer)
 
@@ -31,8 +31,8 @@ find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 # find_package(PortAudio REQUIRED)
-find_package(aubio REQUIRED)
-find_package(SoundIo REQUIRED)
+find_package(Aubio REQUIRED)
+find_package(SoundIO REQUIRED)
 find_package(FFmpeg REQUIRED COMPONENTS AVCODEC AVFORMAT AVUTIL AVFILTER AVDEVICE SWRESAMPLE SWSCALE)
 find_package(MPV REQUIRED)
 
@@ -44,7 +44,7 @@ target_link_libraries(
     ${SDL2_LIBRARY}
     ${SDL2_IMAGE_LIBRARIES}
     ${SDL2_TTF_LIBRARIES}
-    ${AUBIO_LIBRARIES}
+    ${AUBIO_LIBRARY}
     # ${PORTAUDIO_LIBRARIES}
     ${SOUNDIO_LIBRARY}
     ${FFMPEG_LIBRARIES}
