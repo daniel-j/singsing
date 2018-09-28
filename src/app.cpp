@@ -395,6 +395,10 @@ void App::initAudio() {
     // yinChannels = new Yin[instream->layout.channel_count];
     for (int channel = 0; channel < instream->layout.channel_count; ++channel) {
         aubioPitchChannels[channel] = new_aubio_pitch((char*)"yinfast", ANALYSIS_BUFFER_LENGTH, ANALYSIS_HOP_SIZE, instream->sample_rate);
+        if (!aubioPitchChannels[channel]) {
+            std::cerr << "Aubio algorithm not found, falling back to yin" << std::endl;
+            aubioPitchChannels[channel] = new_aubio_pitch((char*)"yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_HOP_SIZE, instream->sample_rate);
+        }
         // yinChannels[channel].initialize(instream->sample_rate, ANALYSIS_BUFFER_LENGTH, 1.0);
     }
 
