@@ -2,6 +2,8 @@
 
 set -e
 
+. ./env.sh
+
 root=$(pwd)
 
 SRC="$root/deps"
@@ -13,11 +15,11 @@ PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
 export CC="gcc"
 export CXX="g++"
 
-export CC="$CC -U_FORTIFY_SOURCE -include $PREFIX/libcwrap.h"
-export CXX="$CXX -U_FORTIFY_SOURCE -D_GLIBCXX_USE_CXX11_ABI=0 -include $PREFIX/libcwrap.h"
+$LINUX && [ "$CROSSWIN" == "false" ] && CC="$CC -U_FORTIFY_SOURCE -include $PREFIX/libcwrap.h"
+$LINUX && [ "$CROSSWIN" == "false" ] && CXX="$CXX -U_FORTIFY_SOURCE -D_GLIBCXX_USE_CXX11_ABI=0 -include $PREFIX/libcwrap.h"
 
 # multicore compilation
-makearg="-j$(nproc)"
+$MACOS && makearg="-j$(sysctl -n hw.ncpu)" || makearg="-j$(nproc)"
 
 clean_prefix() {
 	rm -rf "$PREFIX"
@@ -165,10 +167,15 @@ build_mpv() {
 build_aubio() {
 	echo "Building Aubio"
 	cd "$SRC/aubio"
-	PKG_CONFIG_PATH="$PKG_CONFIG_PATH" python waf configure --prefix="$PREFIX"
-	python waf build $makearg
-	python waf install
-	python waf distclean
+	./scripts/get_waf.sh
+	PKG_CONFIG_PATH="$PKG_CONFIG_PATH" ./waf configure --prefix="$PREFIX" \
+		--disable-fftw3f --disable-fftw3 --disable-avcodec --disable-jack \
+		--disable-sndfile --disable-apple-audio --disable-samplerate \
+		--disable-wavread --disable-wavwrite \
+		--disable-docs --disable-examples
+	./waf build $makearg
+	./waf install
+	./waf distclean
 }
 
 build_portmidi() {
