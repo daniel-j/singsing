@@ -1,20 +1,20 @@
 
+// this needs to be first
 #define GL3_PROTOTYPES 1
 #include <GL/glew.h>
+
 #include "app.hpp"
 #include <iostream>
-#include <fstream>
 #include <algorithm>    // std::min
-// #include <portaudio.h>
 #include <soundio/soundio.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
-#include "base/ringbuffer.hpp"
 #include "util/fpscounter.hpp"
 #include "mpv.hpp"
 #include "util/glutils.hpp"
 #include "util/glprogram.hpp"
 #include "util/glframebuffer.hpp"
+#include "song.hpp"
 
 const int ANALYSIS_BUFFER_LENGTH = 2048;
 const int ANALYSIS_HOP_SIZE = ANALYSIS_BUFFER_LENGTH / 4;
@@ -356,10 +356,10 @@ void App::initAudio() {
     }
     soundio_flush_events(soundio);
 
-    int input_count = soundio_input_device_count(soundio);
+    // int input_count = soundio_input_device_count(soundio);
     int default_input = soundio_default_input_device_index(soundio);
 
-    printf("Input devices: %d\n", input_count);
+    // printf("Input devices: %d\n", input_count);
 
     in_device = soundio_get_input_device(soundio, default_input);
 
@@ -541,10 +541,11 @@ int App::init() {
         return 1;
     }
 
-    std::cout << "GL_VENDOR " << glGetString(GL_VENDOR) << std::endl <<
+    std::cout << std::endl <<
+                 "GL_VENDOR " << glGetString(GL_VENDOR) << std::endl <<
                  "GL_VERSION " << glGetString(GL_VERSION) << std::endl <<
                  "GL_RENDERER " << glGetString(GL_RENDERER) << std::endl <<
-                 "GLSL_VERSION " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
+                 "GLSL_VERSION " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl << std::endl;
 
     GLCall(glEnable(GL_CULL_FACE));
     GLCall(glDepthMask(GL_FALSE));
@@ -561,77 +562,9 @@ int App::init() {
 
 int App::launch() {
 
-    /*
-    auto path = "../notes.txt";
-
-    std::ifstream filein(path);
-
-    auto finishedHeaders = false;
-    auto endFound = false;
-
-    for (std::string line; std::getline(filein, line); ) {
-        if (!line.empty() && *line.rbegin() == '\r') {
-            line.erase( line.length() - 1, 1);
-        }
-        auto len = line.length();
-        if (len == 0 || line[0] == ' ' || (finishedHeaders && line[0] == '#')) {
-            std::cerr << "Invalid linestart found in " << path << " :: \"" << line << "\". Aborting." << std::endl;
-            return 0;
-        }
-        if (!finishedHeaders && line[0] == '#') {
-            auto pos = line.find(':');
-            if (pos == std::string::npos) {
-                std::cerr << "Missing : in header \"" << line << "\"" << std::endl;
-                return 0;
-            }
-            auto identifier = line.substr(1, pos - 1);
-            auto value = line.substr(pos + 1);
-            if (value.empty()) {
-                std::cerr << "Empty value in header \"" << line << "\"" << std::endl;
-                return 0;
-            }
-
-            std::cout << identifier << " " << value << std::endl;
-        } else {
-            if (!finishedHeaders) {
-                finishedHeaders = true;
-            }
-
-            auto tag = line[0];
-            line = (len >= 2 && line[1] == ' ') ? line.substr(2) : line.substr(1);
-            // std::cout << tag << " " << line << std::endl;
-            int startBeat, length;
-
-            switch (tag) {
-                case 'E':
-                    endFound = true;
-                    break;
-                case 'P':
-                    // trimChars
-                    std::cout << "Got P: " << line << std::endl;
-                    break;
-                case ':':
-                case '*':
-                case 'F':
-                    auto pos1 = line.find(' ');
-                    startBeat = std::stoi(line.substr(0, pos1));
-                    auto pos2 = line.find(' ', pos1 + 1);
-                    length = std::stoi(line.substr(pos1 + 1, pos2 - pos1 - 1));
-                    pos1 = line.find(' ', pos2 + 1);
-                    int pitch = std::stoi(line.substr(pos2 + 1, pos1 - pos2 - 1));
-                    auto text = line.substr(pos1 + 1);
-                    if (text.empty()) {
-                        break;
-                    }
-                    printf("type: %c, startBeat: %d, length: %d, pitch: %d, text: \"%s\"\n", tag, startBeat, length, pitch, text.c_str());
-            }
-        }
-    }
-    if (!finishedHeaders) {
-        std::cerr << "Lyrics/Notes missing" << std::endl;
-        return 0;
-    }
-    */
+    Song song;
+    song.parse("../notes.txt");
+    std::cout << "Parsed song: " << song.getTitle() << " by " << song.getArtist() << std::endl;
 
 #ifdef __linux__
     auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 18);
@@ -665,10 +598,12 @@ int App::launch() {
     init_mpv();
     mpv_play("https://www.youtube.com/watch?v=ywjyeaMUibM");
 
+    /*
     int err;
-    /*if ((err = soundio_outstream_start(outstream))) {
+    if ((err = soundio_outstream_start(outstream))) {
         fprintf(stderr, "unable to start output device: %s\n", soundio_strerror(err));
-    }*/
+    }
+    */
 
     SDL_Color textColor{255, 255, 255, 255};
     GLuint fpsTexture;
@@ -804,7 +739,7 @@ int App::launch() {
         GLCall(glDisableVertexAttribArray(square.attribute("position")));
         GLCall(glDisableVertexAttribArray(square.attribute("texcoord")));
 
-        // macOS bug workaround
+        // macOS bug workaround, make sure no framebuffer is active
         GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
         SDL_GL_SwapWindow(mainWindow);
         SDL_Delay(1);
