@@ -9,12 +9,6 @@
 
 #include "mpv.hpp"
 
-#include <mpv/client.h>
-#include <mpv/render_gl.h>
-
-static Uint32 wakeup_on_mpv_redraw, wakeup_on_mpv_events;
-static mpv_handle *mpv = nullptr;
-static mpv_render_context *mpv_gl = nullptr;
 
 static void die(const std::string& msg) {
     std::cerr << msg << std::endl;
@@ -25,17 +19,33 @@ static void *get_proc_address_mpv(void *fn_ctx, const char *name) {
     return SDL_GL_GetProcAddress(name);
 }
 
-static void on_mpv_events(void *ctx) {
-    SDL_Event event{.type = wakeup_on_mpv_events};
+MPV::MPV() {
+
+}
+MPV::~MPV() {
+    if (mpv_gl) {
+        mpv_render_context_free(mpv_gl);
+        mpv_gl = nullptr;
+    }
+    if (mpv) {
+        mpv_terminate_destroy(mpv);
+        mpv = nullptr;
+    }
+}
+
+void MPV::on_mpv_events(void *ctx) {
+    auto self = (MPV*)ctx;
+    SDL_Event event{.type = self->wakeup_on_mpv_events};
     SDL_PushEvent(&event);
 }
 
-static void on_mpv_redraw(void *ctx) {
-    SDL_Event event{.type = wakeup_on_mpv_redraw};
+void MPV::on_mpv_redraw(void *ctx) {
+    auto self = (MPV*)ctx;
+    SDL_Event event{.type = self->wakeup_on_mpv_redraw};
     SDL_PushEvent(&event);
 }
 
-int init_mpv() {
+int MPV::init() {
     if (mpv) die("mpv already initialized");
 
     mpv = mpv_create();
@@ -44,7 +54,7 @@ int init_mpv() {
     }
 
     mpv_set_option_string(mpv, "terminal", "yes");
-    mpv_set_option_string(mpv, "msg-level", "all=status");
+    mpv_set_option_string(mpv, "msg-level", "all=info");
     mpv_set_option_string(mpv, "hwdec", "auto");
     // mpv_set_option_string(mpv, "video-sync", "display-resample");
     mpv_set_option_string(mpv, "video-timing-offset", "0.0");
@@ -52,10 +62,12 @@ int init_mpv() {
     mpv_set_option_string(mpv, "video-latency-hacks", "yes");
     mpv_set_option_string(mpv, "osd-level", "0");
     mpv_set_option_string(mpv, "panscan", "1.0"); // fill view and crop
-    //mpv_set_option_string(mpv, "ao", "libmpv");
-    //mpv_set_option_string(mpv, "ao-libmpv-format", "float32");
-    //mpv_set_option_string(mpv, "ao-libmpv-samplerate", "44100");
-    //mpv_set_option_string(mpv, "ao-libmpv-channel-layouts", "stereo");
+    /*
+    mpv_set_option_string(mpv, "ao", "libmpv");
+    mpv_set_option_string(mpv, "ao-libmpv-format", "float");
+    mpv_set_option_string(mpv, "ao-libmpv-samplerate", "44100");
+    mpv_set_option_string(mpv, "ao-libmpv-channel-layouts", "stereo");
+    */
 
     // Some minor options can only be set before mpv_initialize().
     if (mpv_initialize(mpv) < 0) {
@@ -87,16 +99,16 @@ int init_mpv() {
     }
 
     // When normal mpv events are available.
-    mpv_set_wakeup_callback(mpv, on_mpv_events, NULL);
+    mpv_set_wakeup_callback(mpv, MPV::on_mpv_events, this);
 
     // When a new frame should be drawn with mpv_opengl_cb_draw().
     // (Separate from the normal event handling mechanism for the sake of
     //  users which run OpenGL on a different thread.)
-    mpv_render_context_set_update_callback(mpv_gl, on_mpv_redraw, NULL);
+    mpv_render_context_set_update_callback(mpv_gl, MPV::on_mpv_redraw, this);
     return 0;
 }
 
-int mpv_process_sdl_event(SDL_Event* event) {
+void MPV::processSDLEvent(SDL_Event* event) const {
     switch (event->type) {
     case SDL_WINDOWEVENT:
         if (event->window.event == SDL_WINDOWEVENT_EXPOSED) {
@@ -120,16 +132,17 @@ int mpv_process_sdl_event(SDL_Event* event) {
                 if (mp_event->event_id == MPV_EVENT_NONE)
                     break;
                 printf("event: %s\n", mpv_event_name(mp_event->event_id));
+                // auto mpv_format = mpv_get_audio_format();
+                // std::cout << " MPV format: " << mpv_format << std::endl;
                 if (strcmp(mpv_event_name(mp_event->event_id), "end-file") == 0) {
                     // playback stopped
                 }
             }
         }
     }
-    return 0;
 }
 
-void mpv_play(std::string videoFile, std::string audioFile) {
+void MPV::play(std::string videoFile, std::string audioFile) const {
     // Play this file. Note that this starts playback asynchronously.
     const char *command[]{"loadfile", videoFile.c_str(), NULL};
     mpv_command(mpv, command);
@@ -139,7 +152,7 @@ void mpv_play(std::string videoFile, std::string audioFile) {
     }
 }
 
-void mpv_render(int width, int height, int fbo, int format, int skip_rendering) {
+void MPV::render(int width, int height, int fbo, int format, bool skip_rendering) const {
     mpv_opengl_fbo mpfbo{
         .fbo = fbo,
         .w = width,
@@ -147,6 +160,7 @@ void mpv_render(int width, int height, int fbo, int format, int skip_rendering) 
         .internal_format = format
     };
     int flip_y{0};
+    int skip_render{skip_rendering};
     mpv_render_param params[]{
         // Specify the default framebuffer (0) as target. This will
         // render onto the entire screen. If you want to show the video
@@ -155,7 +169,7 @@ void mpv_render(int width, int height, int fbo, int format, int skip_rendering) 
         {MPV_RENDER_PARAM_OPENGL_FBO, &mpfbo},
         // Flip rendering (needed due to flipped GL coordinate system).
         {MPV_RENDER_PARAM_FLIP_Y, &flip_y},
-        {MPV_RENDER_PARAM_SKIP_RENDERING, &skip_rendering},
+        {MPV_RENDER_PARAM_SKIP_RENDERING, &skip_render},
         {MPV_RENDER_PARAM_INVALID, nullptr}
     };
     // See render_gl.h on what OpenGL environment mpv expects, and
@@ -163,31 +177,24 @@ void mpv_render(int width, int height, int fbo, int format, int skip_rendering) 
     mpv_render_context_render(mpv_gl, params);
 }
 
-void mpv_flip() {
+void MPV::reportSwap() const {
     mpv_render_context_report_swap(mpv_gl);
 }
 
-double mpv_progress() {
+double MPV::getProgressPercent() const {
     double progress = 0.0;
     mpv_get_property(mpv, "percent-pos", MPV_FORMAT_DOUBLE, &progress);
     return progress / 100.0;
 }
 
-int mpv_read_audio(void* buffer, int length) {
+int MPV::readAudioBuffer(void* buffer, int length) const {
     return mpv_audio_callback(mpv, buffer, length);
 }
 
-int mpv_destroy() {
-    // Destroy the GL renderer and all of the GL objects it allocated. If video
-    // is still running, the video track will be deselected.
-    if (mpv_gl) {
-        mpv_render_context_free(mpv_gl);
-        mpv_gl = nullptr;
+std::string MPV::getAudioFormat() const {
+    auto result = mpv_get_property_string(mpv, "audio-out-params/format");
+    if (!result) {
+        return "";
     }
-
-    if (mpv) {
-        mpv_terminate_destroy(mpv);
-        mpv = nullptr;
-    }
-    return 0;
+    return result;
 }

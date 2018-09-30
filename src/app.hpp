@@ -1,7 +1,6 @@
 #pragma once
 
 #include <SDL2/SDL.h>
-#include "lib/yin/yin.hpp"
 #include <aubio/aubio.h>
 
 
@@ -13,7 +12,6 @@ class App {
     void initAudio();
     int initGL();
  public:
-    Yin* yinChannels = nullptr;
     aubio_pitch_t** aubioPitchChannels = nullptr;
     App();
     ~App();

@@ -33,6 +33,7 @@ static struct SoundIoDevice *in_device;
 static struct SoundIoInStream *instream;
 static struct SoundIoDevice *out_device;
 static struct SoundIoOutStream *outstream;
+static MPV* mpv = nullptr;
 static std::vector<float> mpv_audio_buffer;
 
 static std::string tones[]{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
@@ -297,7 +298,7 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
 
     mpv_audio_buffer.resize(frames_left * outstream->layout.channel_count);
 
-    int mpv_frames = mpv_read_audio((void*)mpv_audio_buffer.data(), frames_left * outstream->bytes_per_frame);
+    int mpv_frames = mpv->readAudioBuffer((void*)mpv_audio_buffer.data(), frames_left * outstream->bytes_per_frame);
 
     for (;;) {
         int frame_count = frames_left;
@@ -410,7 +411,18 @@ void App::initAudio() {
                 instream->layout.name, instream->sample_rate, soundio_format_string(instream->format));
 
 
-    int default_output = soundio_default_output_device_index(soundio);
+    auto output_count = soundio_output_device_count(soundio);
+    auto default_output = soundio_default_output_device_index(soundio);
+    for (int i = 0; i < output_count; i += 1) {
+        auto device = soundio_get_output_device(soundio, i);
+        if (strcmp(device->id, "void") == 0) {
+            std::cout << i << std::endl;
+            default_output = i;
+        }
+        soundio_device_unref(device);
+    }
+
+
     out_device = soundio_get_output_device(soundio, default_output);
     printf("Output device: %s\n", out_device->name);
 
@@ -478,7 +490,10 @@ App::App() {
 App::~App() {
     soundio_instream_pause(instream, true);
     soundio_outstream_pause(outstream, true);
-    mpv_destroy();
+    if (mpv) {
+        delete mpv;
+        mpv = nullptr;
+    }
     if (glctx) SDL_GL_DeleteContext(glctx);
     if (renderer) SDL_DestroyRenderer(renderer);
     if (mainWindow) SDL_DestroyWindow(mainWindow);
@@ -491,7 +506,7 @@ App::~App() {
     soundio_outstream_destroy(outstream);
     soundio_device_unref(out_device);
     soundio_destroy(soundio);
-    if (yinChannels) delete[] yinChannels;
+    // if (yinChannels) delete[] yinChannels;
     if (aubioPitchChannels) {
         del_aubio_pitch(aubioPitchChannels[0]);
         del_aubio_pitch(aubioPitchChannels[1]);
@@ -595,8 +610,11 @@ int App::launch() {
 
     Framebuffer mpv_fbo;
 
-    init_mpv();
-    mpv_play("https://www.youtube.com/watch?v=ywjyeaMUibM");
+    mpv = new MPV;
+
+    mpv->init();
+
+    mpv->play("https://www.youtube.com/watch?v=ywjyeaMUibM");
 
     /*
     int err;
@@ -631,7 +649,7 @@ int App::launch() {
                 isrunning = false;
                 break;
               }
-              mpv_process_sdl_event(&e);
+              mpv->processSDLEvent(&e);
         }
         if (!isrunning) break;
         float framespersecond = fpsupdate();
@@ -657,7 +675,7 @@ int App::launch() {
         // render mpv video frame to framebuffer
         mpv_fbo.resize(winWidth, winHeight);
         GLCall(glDisable(GL_CULL_FACE));
-        GLCall(mpv_render(winWidth, winHeight, mpv_fbo.getHandle(), 0));
+        GLCall(mpv->render(winWidth, winHeight, mpv_fbo.getHandle(), 0));
         GLCall(glEnable(GL_CULL_FACE));
 
         // restore state
@@ -705,7 +723,7 @@ int App::launch() {
 
         square.setUniform("textureOpacity", 0.0);
 
-        auto progress = mpv_progress();
+        auto progress = mpv->getProgressPercent();
         square.setUniform("viewSize", winWidth, 15);
         square.setUniform("viewOffset", 0, winHeight - 15);
         square.setUniform("bgColor", 0.0, 0.0, 0.0, 0.3);
@@ -743,7 +761,7 @@ int App::launch() {
         GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
         SDL_GL_SwapWindow(mainWindow);
         SDL_Delay(1);
-        mpv_flip();
+        mpv->reportSwap();
         firstFrame = false;
     }
 
