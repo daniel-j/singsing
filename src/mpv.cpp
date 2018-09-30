@@ -45,7 +45,7 @@ void MPV::on_mpv_redraw(void *ctx) {
     SDL_PushEvent(&event);
 }
 
-int MPV::init() {
+int MPV::init(bool useLibmpvAudio) {
     if (mpv) die("mpv already initialized");
 
     mpv = mpv_create();
@@ -62,12 +62,12 @@ int MPV::init() {
     mpv_set_option_string(mpv, "video-latency-hacks", "yes");
     mpv_set_option_string(mpv, "osd-level", "0");
     mpv_set_option_string(mpv, "panscan", "1.0"); // fill view and crop
-    /*
-    mpv_set_option_string(mpv, "ao", "libmpv");
-    mpv_set_option_string(mpv, "ao-libmpv-format", "float");
-    mpv_set_option_string(mpv, "ao-libmpv-samplerate", "44100");
-    mpv_set_option_string(mpv, "ao-libmpv-channel-layouts", "stereo");
-    */
+    if (useLibmpvAudio) {
+        mpv_set_option_string(mpv, "ao", "libmpv");
+        mpv_set_option_string(mpv, "ao-libmpv-format", "float");
+        mpv_set_option_string(mpv, "ao-libmpv-samplerate", "44100");
+        mpv_set_option_string(mpv, "ao-libmpv-channel-layouts", "stereo");
+    }
 
     // Some minor options can only be set before mpv_initialize().
     if (mpv_initialize(mpv) < 0) {

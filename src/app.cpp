@@ -416,12 +416,10 @@ void App::initAudio() {
     for (int i = 0; i < output_count; i += 1) {
         auto device = soundio_get_output_device(soundio, i);
         if (strcmp(device->id, "void") == 0) {
-            std::cout << i << std::endl;
-            default_output = i;
+            // default_output = i;
         }
         soundio_device_unref(device);
     }
-
 
     out_device = soundio_get_output_device(soundio, default_output);
     printf("Output device: %s\n", out_device->name);
@@ -436,12 +434,20 @@ void App::initAudio() {
 
     outstream->name = soundio->app_name;
     outstream->sample_rate = soundio_device_nearest_sample_rate(out_device, 44100);
-    outstream->format = SoundIoFormatFloat32NE;
     outstream->layout = *soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdStereo);
     outstream->write_callback = write_callback;
     outstream->underflow_callback = underflow_callback;
     outstream->userdata = this;
     // outstream->software_latency = 0.200; // 200 ms
+
+    if (soundio_device_supports_format(out_device, SoundIoFormatFloat32LE)) {
+        outstream->format = SoundIoFormatFloat32NE;
+    } else {
+        outstream->format = SoundIoFormatInvalid;
+        soundio_outstream_destroy(outstream);
+        outstream = nullptr;
+        return;
+    }
 
     if ((err = soundio_outstream_open(outstream))) {
         fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
@@ -489,7 +495,7 @@ App::App() {
 }
 App::~App() {
     soundio_instream_pause(instream, true);
-    soundio_outstream_pause(outstream, true);
+    if (outstream) soundio_outstream_pause(outstream, true);
     if (mpv) {
         delete mpv;
         mpv = nullptr;
@@ -503,7 +509,7 @@ App::~App() {
     // soundio_ring_buffer_destroy(ring_buffer);
     soundio_instream_destroy(instream);
     soundio_device_unref(in_device);
-    soundio_outstream_destroy(outstream);
+    if (outstream) soundio_outstream_destroy(outstream);
     soundio_device_unref(out_device);
     soundio_destroy(soundio);
     // if (yinChannels) delete[] yinChannels;
@@ -612,16 +618,14 @@ int App::launch() {
 
     mpv = new MPV;
 
-    mpv->init();
+    mpv->init(outstream != nullptr);
 
     mpv->play("https://www.youtube.com/watch?v=ywjyeaMUibM");
 
-    /*
     int err;
-    if ((err = soundio_outstream_start(outstream))) {
+    if (outstream && (err = soundio_outstream_start(outstream))) {
         fprintf(stderr, "unable to start output device: %s\n", soundio_strerror(err));
     }
-    */
 
     SDL_Color textColor{255, 255, 255, 255};
     GLuint fpsTexture;

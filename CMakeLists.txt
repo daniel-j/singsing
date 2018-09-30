@@ -26,7 +26,6 @@ include_directories("${CMAKE_PREFIX_PATH}/include")
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
-# find_package(glm REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
 find_package(SDL2_ttf REQUIRED)
@@ -39,12 +38,10 @@ target_link_libraries(
     ${PROJECT_NAME}
     ${OPENGL_LIBRARIES}
     ${GLEW_LIBRARIES}
-    # ${GLM_LIBRARIES}
     ${SDL2_LIBRARY}
     ${SDL2_IMAGE_LIBRARIES}
     ${SDL2_TTF_LIBRARIES}
     ${AUBIO_LIBRARY}
-    # ${PORTAUDIO_LIBRARIES}
     ${SOUNDIO_LIBRARY}
     ${FFMPEG_LIBRARIES}
     ${MPV_LIBRARY}
