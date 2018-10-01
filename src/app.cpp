@@ -445,7 +445,8 @@ void App::initAudio() {
     outstream->write_callback = write_callback;
     outstream->underflow_callback = underflow_callback;
     outstream->userdata = this;
-    outstream->software_latency = 0.040; // 40 ms
+    // pulseaudio likes a high latency
+    outstream->software_latency = 0.060; // 60 ms
 
     if ((err = soundio_outstream_open(outstream))) {
         fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
