@@ -537,6 +537,8 @@ int App::init() {
     // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
+    // Don't disable desktop compositing (e.g. KDE Plasma)
+    SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
 
     mainWindow = SDL_CreateWindow("singsing",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
