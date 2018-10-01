@@ -34,7 +34,7 @@ static struct SoundIoInStream *instream;
 static struct SoundIoDevice *out_device;
 static struct SoundIoOutStream *outstream;
 static MPV* mpv = nullptr;
-static std::vector<float> mpv_audio_buffer;
+static std::vector<int16_t> mpv_audio_buffer;
 
 static std::string tones[]{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -298,7 +298,7 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
 
     mpv_audio_buffer.resize(frames_left * outstream->layout.channel_count);
 
-    int mpv_frames = mpv->readAudioBuffer((void*)mpv_audio_buffer.data(), frames_left * outstream->bytes_per_frame);
+    int mpv_frames = mpv->readAudioBuffer((void*)mpv_audio_buffer.data(), frames_left * outstream->layout.channel_count * 2);
 
     for (;;) {
         int frame_count = frames_left;
@@ -315,8 +315,8 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
 
         for (int frame = 0; frame < frame_count; frame += 1) {
             for (int channel = 0; channel < layout->channel_count; channel += 1) {
-                float sample = mpv_audio_buffer[frame * layout->channel_count + channel];
-                float *buf = (float *)areas[channel].ptr;
+                int16_t sample = mpv_audio_buffer[frame * layout->channel_count + channel];
+                int16_t *buf = (int16_t*)areas[channel].ptr;
                 *buf = sample;
                 areas[channel].ptr += areas[channel].step;
             }
@@ -376,7 +376,7 @@ void App::initAudio() {
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
     instream->userdata = this;
-    instream->software_latency = 0.008; // 8 ms
+    instream->software_latency = 0.010; // 10 ms
 
     std::cout << "Software latency: " << instream->software_latency << std::endl;
 
@@ -430,24 +430,22 @@ void App::initAudio() {
 
     soundio_device_sort_channel_layouts(out_device);
 
+    if (!soundio_device_supports_format(out_device, SoundIoFormatS16LE)) {
+        soundio_device_unref(out_device);
+        out_device = nullptr;
+        return;
+    }
+
     outstream = soundio_outstream_create(out_device);
 
     outstream->name = soundio->app_name;
+    outstream->format = SoundIoFormatS16LE;
     outstream->sample_rate = soundio_device_nearest_sample_rate(out_device, 44100);
     outstream->layout = *soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdStereo);
     outstream->write_callback = write_callback;
     outstream->underflow_callback = underflow_callback;
     outstream->userdata = this;
-    // outstream->software_latency = 0.200; // 200 ms
-
-    if (soundio_device_supports_format(out_device, SoundIoFormatFloat32LE)) {
-        outstream->format = SoundIoFormatFloat32NE;
-    } else {
-        outstream->format = SoundIoFormatInvalid;
-        soundio_outstream_destroy(outstream);
-        outstream = nullptr;
-        return;
-    }
+    outstream->software_latency = 0.040; // 40 ms
 
     if ((err = soundio_outstream_open(outstream))) {
         fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
@@ -510,7 +508,7 @@ App::~App() {
     soundio_instream_destroy(instream);
     soundio_device_unref(in_device);
     if (outstream) soundio_outstream_destroy(outstream);
-    soundio_device_unref(out_device);
+    if (out_device) soundio_device_unref(out_device);
     soundio_destroy(soundio);
     // if (yinChannels) delete[] yinChannels;
     if (aubioPitchChannels) {

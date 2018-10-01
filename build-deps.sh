@@ -156,9 +156,10 @@ build_mpv() {
 		--disable-manpage-build --disable-android --disable-javascript \
 		--disable-libass --disable-libass-osd --disable-libbluray \
 		--disable-vapoursynth --disable-vapoursynth-lazy --disable-libarchive \
-		--disable-oss-audio --disable-rsound \
+		--disable-oss-audio --disable-rsound --disable-wasapi --disable-alsa --disable-jack --disable-opensles \
 		--disable-tv-v4l2 --disable-libv4l2 --disable-audio-input \
 		--disable-apple-remote --disable-macos-touchbar --disable-macos-cocoa-cb \
+		--disable-caca --disable-jpeg --disable-vulkan --disable-xv \
 		--disable-lua # ythook
 	./waf build $makearg
 	./waf install

@@ -64,7 +64,7 @@ int MPV::init(bool useLibmpvAudio) {
     mpv_set_option_string(mpv, "panscan", "1.0"); // fill view and crop
     if (useLibmpvAudio) {
         mpv_set_option_string(mpv, "ao", "libmpv");
-        mpv_set_option_string(mpv, "ao-libmpv-format", "float");
+        mpv_set_option_string(mpv, "ao-libmpv-format", "s16");
         mpv_set_option_string(mpv, "ao-libmpv-samplerate", "44100");
         mpv_set_option_string(mpv, "ao-libmpv-channel-layouts", "stereo");
     }
