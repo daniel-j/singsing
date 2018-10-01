@@ -56,7 +56,7 @@ int MPV::init(bool useLibmpvAudio) {
     mpv_set_option_string(mpv, "terminal", "yes");
     mpv_set_option_string(mpv, "msg-level", "all=info");
     mpv_set_option_string(mpv, "hwdec", "auto");
-    // mpv_set_option_string(mpv, "video-sync", "display-resample");
+    mpv_set_option_string(mpv, "video-sync", "audio");
     mpv_set_option_string(mpv, "video-timing-offset", "0.0");
     mpv_set_option_string(mpv, "audio-client-name", "singsing");
     mpv_set_option_string(mpv, "video-latency-hacks", "yes");
@@ -64,7 +64,7 @@ int MPV::init(bool useLibmpvAudio) {
     mpv_set_option_string(mpv, "panscan", "1.0"); // fill view and crop
     if (useLibmpvAudio) {
         mpv_set_option_string(mpv, "ao", "libmpv");
-        mpv_set_option_string(mpv, "ao-libmpv-format", "s16");
+        mpv_set_option_string(mpv, "ao-libmpv-format", "float");
         mpv_set_option_string(mpv, "ao-libmpv-samplerate", "44100");
         mpv_set_option_string(mpv, "ao-libmpv-channel-layouts", "stereo");
     }

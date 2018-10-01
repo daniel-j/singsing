@@ -27,82 +27,20 @@ clean_prefix() {
 	cp -f "$SRC/libcwrap.h" "$PREFIX/libcwrap.h"
 }
 
-build_zlib() {
-	echo "Building zlib"
-	cd "$SRC/zlib"
-	./configure --prefix="$PREFIX"
-	make $makearg
-	make install
-	make distclean
-}
-
-build_libpng() {
-	echo "Building libpng"
-	cd "$SRC/libpng"
-	./configure --prefix="$PREFIX" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
-		--disable-static
-	make $makearg
-	make install
-	make distclean
-}
-
-build_freetype() {
-	echo "Building FreeType"
-	cd "$SRC/freetype"
-	./configure --prefix="$PREFIX" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
-		--disable-static --with-harfbuzz=no --with-png=yes --with-bzip2=no
-	make $makearg
-	make install
-	make distclean
-}
-
-build_sdl2() {
-	echo "Building SDL2"
-	cd "$SRC/SDL2"
-	bash ./autogen.sh
+build_ftgl() {
+	echo "Building Freetype GL"
+	cd "$SRC/ftgl"
 	mkdir -p build
 	cd build
-	../configure --prefix="$PREFIX" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
-		--enable-sdl-dlopen \
-		--disable-arts --disable-esd --disable-nas \
-		--disable-sndio --enable-alsa --enable-pulseaudio-shared \
-		--enable-video-wayland --enable-wayland-shared \
-		--enable-x11-shared --enable-ibus --enable-fcitx --enable-ime \
-		--disable-rpath --disable-input-tslib
+	rm -f CMakeCache.txt
+	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+		-Dfreetype-gl_BUILD_APIDOC=OFF \
+		-Dfreetype-gl_BUILD_DEMOS=OFF \
+		-Dfreetype-gl_BUILD_TESTS=OFF
 	make $makearg
 	make install
-	make distclean
-}
-
-build_sdl2_image() {
-	echo "Building SDL2_image"
-	cd "$SRC/SDL2_image"
-	bash ./autogen.sh
-	./configure --prefix="$PREFIX" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
-		--with-sdl-prefix="$PREFIX" --disable-static
-	make $makearg
-	make install
-	make distclean
-}
-
-build_sqlite() {
-	echo "Building SQLite"
-	cd "$SRC/sqlite"
-	./configure --prefix="$PREFIX" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
-		--disable-static
-	make $makearg
-	make install
-	make distclean
-}
-
-build_portaudio() {
-	echo "Building PortAudio"
-	cd "$SRC/portaudio"
-	./configure --prefix="$PREFIX" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
-		--without-jack --disable-static
-	make $makearg
-	make install
-	make distclean
+	install -v makefont "$PREFIX/bin/makefont"
+	make clean
 }
 
 build_yasm() {
@@ -180,49 +118,6 @@ build_aubio() {
 	./waf distclean
 }
 
-build_portmidi() {
-	echo "Building PortMidi"
-	cd "$SRC"
-	find portmidi/ portmidi-debian/patches/ -type f | while read a ; do
-		tr -d '\r' < "$a" > t
-		cat t >$a
-	done
-	rm t
-	cd portmidi
-	while read a ; do
-		patch -l -p1 < ../portmidi-debian/patches/$a
-	done < ../portmidi-debian/patches/series
-	mkdir -p build
-	cd build
-	cmake \
-		-DCMAKE_CACHEFILE_DIR=$(pwd)/out \
-		-DCMAKE_INSTALL_PREFIX="$PREFIX" \
-		-DCMAKE_BUILD_TYPE="Release" \
-		..
-	make portmidi-dynamic
-	make -C pm_dylib install
-	cd ..
-	rm -R build
-}
-
-# echo "Building projectM"
-# cd "$SRC/projectm"
-# mkdir -p build
-# cd build
-# cmake \
-# 	-Wno-dev \
-# 	-DINCLUDE-PROJECTM-QT=0 \
-# 	-DINCLUDE-PROJECTM-PULSEAUDIO=0 \
-# 	-DINCLUDE-PROJECTM-LIBVISUAL=0 \
-# 	-DINCLUDE-PROJECTM-JACK=0 \
-# 	-DINCLUDE-PROJECTM-TEST=0 \
-# 	-DINCLUDE-PROJECTM-XMMS=0 \
-# 	-DCMAKE_INSTALL_PREFIX="$PREFIX" \
-# 	-DCMAKE_BUILD_TYPE=Release \
-# 	..
-# make
-# make install
-
 
 # START OF BUILD PROCESS
 
@@ -230,16 +125,7 @@ if [ "$1" == "all" ]; then
 	echo "Building all dependencies"
 	clean_prefix
 
-	#build_zlib
-
-	#build_libpng
-	#build_freetype
-
-	#build_sdl2
-	#build_sdl2_image
-
-	#build_sqlite
-	#build_portaudio
+	build_ftgl
 
 	build_yasm
 	build_ffmpeg
@@ -248,7 +134,6 @@ if [ "$1" == "all" ]; then
 
 	build_aubio
 
-	#build_portmidi
 
 elif [ ! -z "$1" ]; then
 	echo "Building dependencies $1"

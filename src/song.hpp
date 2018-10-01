@@ -8,9 +8,10 @@ struct SongMetadata {
 	std::string artist;
 	std::string creator;
 	std::string genre;
+	int year = 0;
 	std::string language;
 	std::string edition;
-	std::string audioFile; // MP3
+	std::string audioFile; // MP3 field
 	std::string coverFile;
 	std::string backgroundFile;
 	std::string videoFile;

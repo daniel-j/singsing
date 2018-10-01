@@ -34,7 +34,7 @@ static struct SoundIoInStream *instream;
 static struct SoundIoDevice *out_device;
 static struct SoundIoOutStream *outstream;
 static MPV* mpv = nullptr;
-static std::vector<int16_t> mpv_audio_buffer;
+static std::vector<float> mpv_audio_buffer;
 
 static std::string tones[]{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -298,7 +298,7 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
 
     mpv_audio_buffer.resize(frames_left * outstream->layout.channel_count);
 
-    int mpv_frames = mpv->readAudioBuffer((void*)mpv_audio_buffer.data(), frames_left * outstream->layout.channel_count * 2);
+    int mpv_frames = mpv->readAudioBuffer((void*)mpv_audio_buffer.data(), frames_left * outstream->layout.channel_count * 4);
 
     for (;;) {
         int frame_count = frames_left;
@@ -315,8 +315,8 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
 
         for (int frame = 0; frame < frame_count; frame += 1) {
             for (int channel = 0; channel < layout->channel_count; channel += 1) {
-                int16_t sample = mpv_audio_buffer[frame * layout->channel_count + channel];
-                int16_t *buf = (int16_t*)areas[channel].ptr;
+                float sample = mpv_audio_buffer[frame * layout->channel_count + channel];
+                float *buf = (float*)areas[channel].ptr;
                 *buf = sample;
                 areas[channel].ptr += areas[channel].step;
             }
@@ -430,7 +430,7 @@ void App::initAudio() {
 
     soundio_device_sort_channel_layouts(out_device);
 
-    if (!soundio_device_supports_format(out_device, SoundIoFormatS16LE)) {
+    if (!soundio_device_supports_format(out_device, SoundIoFormatFloat32NE)) {
         soundio_device_unref(out_device);
         out_device = nullptr;
         return;
@@ -439,7 +439,7 @@ void App::initAudio() {
     outstream = soundio_outstream_create(out_device);
 
     outstream->name = soundio->app_name;
-    outstream->format = SoundIoFormatS16LE;
+    outstream->format = SoundIoFormatFloat32NE;
     outstream->sample_rate = soundio_device_nearest_sample_rate(out_device, 44100);
     outstream->layout = *soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdStereo);
     outstream->write_callback = write_callback;
@@ -582,7 +582,7 @@ int App::init() {
 int App::launch() {
 
     Song song;
-    song.parse("../notes.txt");
+    song.parse("../deps/cold-notes.txt");
     std::cout << "Parsed song: " << song.getTitle() << " by " << song.getArtist() << std::endl;
 
 #ifdef __linux__
@@ -618,7 +618,10 @@ int App::launch() {
 
     mpv->init(outstream != nullptr);
 
-    mpv->play("https://www.youtube.com/watch?v=ywjyeaMUibM");
+    mpv->play(
+        "../deps/cold-video.mp4",
+        "../deps/cold-song.mp3"
+    );
 
     int err;
     if (outstream && (err = soundio_outstream_start(outstream))) {

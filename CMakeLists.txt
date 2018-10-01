@@ -29,6 +29,7 @@ find_package(GLEW REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
 find_package(SDL2_ttf REQUIRED)
+find_package(FreetypeGL REQUIRED)
 find_package(SoundIO REQUIRED)
 find_package(Aubio REQUIRED)
 find_package(FFmpeg REQUIRED COMPONENTS AVCODEC AVFORMAT AVUTIL AVFILTER AVDEVICE SWRESAMPLE SWSCALE)
@@ -41,8 +42,9 @@ target_link_libraries(
     ${SDL2_LIBRARY}
     ${SDL2_IMAGE_LIBRARIES}
     ${SDL2_TTF_LIBRARIES}
-    ${AUBIO_LIBRARY}
+    ${FREETYPE_LIBRARY}
     ${SOUNDIO_LIBRARY}
+    ${AUBIO_LIBRARY}
     ${FFMPEG_LIBRARIES}
     ${MPV_LIBRARY}
 )

@@ -46,6 +46,8 @@ const int Song::parse(const std::string &path) {
                 metadata.creator = value;
             } else if (identifier == "GENRE") {
                 metadata.genre = value;
+            } else if (identifier == "YEAR") {
+                metadata.year = std::stoi(value);
             } else if (identifier == "LANGUAGE") {
                 metadata.language = value;
             } else if (identifier == "EDITION") {

@@ -1,11 +1,12 @@
 #pragma once
 
+#define MPV_ENABLE_DEPRECATED 0
+
 #include <string>
 #include <mpv/client.h>
 #include <mpv/render_gl.h>
 #include <SDL2/SDL.h>
 
-#define MPV_ENABLE_DEPRECATED 0
 
 class MPV {
 public:

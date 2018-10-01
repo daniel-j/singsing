@@ -3,7 +3,7 @@
 #
 #  AUBIO_FOUND - system has Aubio
 #  AUBIO_INCLUDE_DIR - the Aubio include directory
-#  AUBIO_LIBRARIES - Link these to use Aubio
+#  AUBIO_LIBRARY - Link these to use Aubio
 #
 
 find_path(AUBIO_INCLUDE_DIR NAMES aubio/aubio.h)
