@@ -32,8 +32,9 @@ static float currentConfidence2 = 0.0;
 static struct SoundIo *soundio;
 static struct SoundIoDevice *in_device;
 static struct SoundIoInStream *instream;
-static struct SoundIoDevice *out_device;
-static struct SoundIoOutStream *outstream;
+// static struct SoundIoDevice *out_device;
+// static struct SoundIoOutStream *outstream;
+static SDL_AudioDeviceID out_device = 0;
 static MPV* mpv = nullptr;
 static std::vector<float> mpv_audio_buffer;
 
@@ -187,8 +188,6 @@ void App::analyzeAudio(const int& channel, const float* const buffer, float* con
 void checkRingbuffer(App* app, int bytes_per_frame) {
     float pitch1, probability1, note1;
     float pitch2, probability2, note2;
-    int tone;
-    float threshold = 0.03f;
 
     float *read_ptr = (float*)soundio_ring_buffer_read_ptr(ring_buffer);
 
@@ -290,7 +289,11 @@ static void read_callback(struct SoundIoInStream *instream, int frame_count_min,
     //std::cout << std::endl;
 }
 
+static void sdl_write_callback(void* userdata, Uint8* stream, int len) {
+    mpv->readAudioBuffer((void*)stream, len);
+}
 
+/*
 static void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max) {
     struct SoundIoChannelArea *areas;
     int err;
@@ -336,17 +339,35 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
         }
     }
 }
+*/
 
-static void overflow_callback(struct SoundIoInStream *instream) {
+static void overflow_callback(struct SoundIoInStream*) {
     static int count = 0;
     fprintf(stderr, "overflow %d\n", ++count);
 }
-static void underflow_callback(struct SoundIoOutStream *outstream) {
+static void underflow_callback(struct SoundIoOutStream*) {
     static int count = 0;
     fprintf(stderr, "underflow %d\n", ++count);
 }
 
 void App::initAudio() {
+    // hack to unsuspend input devices
+    std::string sdlAudioDriver = SDL_GetCurrentAudioDriver();
+    if (sdlAudioDriver == "pulseaudio") {
+        int count = SDL_GetNumAudioDevices(1);
+        for (int i = 0; i < count; ++i) {
+            auto name = SDL_GetAudioDeviceName(i, 1);
+            std::cout << "Waking up audio input device " << name << std::endl;
+            SDL_AudioSpec want, have;
+            SDL_zero(want);
+            auto dev = SDL_OpenAudioDevice(name, 1, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
+            if (dev) {
+                SDL_PauseAudioDevice(dev, 0);
+                SDL_Delay(10);
+                SDL_CloseAudioDevice(dev);
+            }
+        }
+    }
 
     // soundio
     soundio = soundio_create();
@@ -365,14 +386,14 @@ void App::initAudio() {
 
     in_device = soundio_get_input_device(soundio, default_input);
 
-    printf("Input device: %s\n", in_device->name);
+    printf("Input device: %s (%s)\n", in_device->name, in_device->id);
 
     soundio_device_sort_channel_layouts(in_device);
 
     instream = soundio_instream_create(in_device);
 
     instream->name = "Input #1";
-    instream->sample_rate = soundio_device_nearest_sample_rate(in_device, 44100);
+    instream->sample_rate = soundio_device_nearest_sample_rate(in_device, 48000);
     instream->format = SoundIoFormatFloat32NE;
     instream->read_callback = read_callback;
     instream->overflow_callback = overflow_callback;
@@ -411,7 +432,7 @@ void App::initAudio() {
     fprintf(stderr, "%s %d Hz %s interleaved\n",
                 instream->layout.name, instream->sample_rate, soundio_format_string(instream->format));
 
-
+    /*
     auto output_count = soundio_output_device_count(soundio);
     auto default_output = soundio_default_output_device_index(soundio);
     for (int i = 0; i < output_count; i += 1) {
@@ -446,10 +467,27 @@ void App::initAudio() {
     outstream->write_callback = write_callback;
     outstream->underflow_callback = underflow_callback;
     outstream->userdata = this;
-    outstream->software_latency = 0.040; // 40 ms
+    // pulseaudio likes a high latency
+    outstream->software_latency = 0.060; // 60 ms
 
     if ((err = soundio_outstream_open(outstream))) {
         fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
+    }
+    */
+
+    // SDL2 audio output
+
+    SDL_AudioSpec want, have;
+    SDL_zero(want);
+    want.freq = 48000;
+    want.format = AUDIO_F32;
+    want.channels = 2;
+    want.samples = 512;
+    want.callback = sdl_write_callback;
+    out_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+    if (!out_device) {
+        SDL_Log("Failed to open audio: %s", SDL_GetError());
+        return;
     }
 }
 
@@ -494,7 +532,8 @@ App::App() {
 }
 App::~App() {
     soundio_instream_pause(instream, true);
-    if (outstream) soundio_outstream_pause(outstream, true);
+    // if (outstream) soundio_outstream_pause(outstream, true);
+    if (out_device) SDL_CloseAudioDevice(out_device);
     if (mpv) {
         delete mpv;
         mpv = nullptr;
@@ -508,8 +547,8 @@ App::~App() {
     // soundio_ring_buffer_destroy(ring_buffer);
     soundio_instream_destroy(instream);
     soundio_device_unref(in_device);
-    if (outstream) soundio_outstream_destroy(outstream);
-    if (out_device) soundio_device_unref(out_device);
+    // if (outstream) soundio_outstream_destroy(outstream);
+    // if (out_device) soundio_device_unref(out_device);
     soundio_destroy(soundio);
     // if (yinChannels) delete[] yinChannels;
     if (aubioPitchChannels) {
@@ -537,6 +576,8 @@ int App::init() {
     // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
+    // Don't disable desktop compositing (e.g. KDE Plasma)
+    SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
 
     mainWindow = SDL_CreateWindow("singsing",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -622,17 +663,20 @@ int App::launch() {
 
     mpv = new MPV;
 
-    mpv->init(outstream != nullptr);
+    mpv->init(out_device);
 
     mpv->play(
         "../deps/cold-video.mp4",
         "../deps/cold-song.mp3"
     );
 
+    /*
     int err;
     if (outstream && (err = soundio_outstream_start(outstream))) {
         fprintf(stderr, "unable to start output device: %s\n", soundio_strerror(err));
     }
+    */
+    if (out_device) SDL_PauseAudioDevice(out_device, 0); // start audio output
 
     SDL_Color textColor{255, 255, 255, 255};
     GLuint fpsTexture;
