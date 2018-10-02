@@ -132,6 +132,15 @@ build_aubio() {
 	./waf distclean
 }
 
+build_projectm() {
+	echo "Building projectM"
+	cd "$SRC/projectm"
+	./configure --prefix="$PREFIX" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
+		--disable-rpath --disable-qt --disable-sdl --disable-emscripten --disable-gles
+	make $makearg
+	make install
+	make clean
+}
 
 # START OF BUILD PROCESS
 

@@ -5,7 +5,7 @@
 // FPS counter from:
 // http://sdl.beuc.net/sdl.wiki/SDL_Average_FPS_Measurement
 
-#define FRAME_VALUES 20
+#define FRAME_VALUES 40
 
 // An array to store frame times:
 Uint32 frametimes[FRAME_VALUES];

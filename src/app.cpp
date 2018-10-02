@@ -6,15 +6,21 @@
 #include "app.hpp"
 #include <iostream>
 #include <algorithm>    // std::min
+#include <chrono>
+#include <thread>       // std::this_thread::sleep_for
+
 #include <soundio/soundio.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include "util/fpscounter.hpp"
-#include "mpv.hpp"
 #include "util/glutils.hpp"
 #include "util/glprogram.hpp"
 #include "util/glframebuffer.hpp"
+#include "mpv.hpp"
 #include "song.hpp"
+#include "font.hpp"
+
+const int MAX_FRAMES_PER_SECOND = 60;
 
 const int ANALYSIS_BUFFER_LENGTH = 2048;
 const int ANALYSIS_HOP_SIZE = ANALYSIS_BUFFER_LENGTH / 4;
@@ -35,7 +41,7 @@ static struct SoundIoInStream *instream;
 // static struct SoundIoOutStream *outstream;
 static SDL_AudioDeviceID out_device = 0;
 static MPV* mpv = nullptr;
-static std::vector<float> mpv_audio_buffer;
+// static std::vector<float> mpv_audio_buffer;
 
 static std::string tones[]{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -167,21 +173,10 @@ void App::analyzeAudio(const int& channel, const float* const buffer, float* con
         channelBuffer[i] = buffer[i * 2 + channel];
     }
 
-    fvec_t out{
-        1,
-        pitch
-    };
-    fvec_t buf{
-        ANALYSIS_HOP_SIZE,
-        (float*)&channelBuffer
-    };
+    fvec_t buf{ ANALYSIS_HOP_SIZE, (float*)&channelBuffer };
+    fvec_t out{ 1, pitch };
     aubio_pitch_do(aubioPitchChannels[channel], &buf, &out);
     *probability = aubio_pitch_get_confidence(aubioPitchChannels[channel]);
-    //std::cout << "A: " << *pitch << " " << *probability << std::endl;
-
-    // *pitch = yinChannels[channel].getPitch(buffer, 0);
-    // *probability = yinChannels[channel].getProbability();
-    //std::cout << "B: " << *pitch << " " << *probability << std::endl;
 }
 
 void checkRingbuffer(App* app, int bytes_per_frame) {
@@ -190,7 +185,6 @@ void checkRingbuffer(App* app, int bytes_per_frame) {
 
     float *read_ptr = (float*)soundio_ring_buffer_read_ptr(ring_buffer);
 
-    // app->analyzeAudio(0, ring.buffer(), &pitch, &probability, false);
     app->analyzeAudio(0, read_ptr, &pitch1, &probability1);
     app->analyzeAudio(1, read_ptr, &pitch2, &probability2);
 
@@ -288,8 +282,18 @@ static void read_callback(struct SoundIoInStream *instream, int frame_count_min,
     //std::cout << std::endl;
 }
 
-static void sdl_write_callback(void* userdata, Uint8* stream, int len) {
-    mpv->readAudioBuffer((void*)stream, len);
+static void write_audio_callback(void* userdata, Uint8* stream, int len) {
+    memset(stream, 0, len);
+    int frames_written = 0;
+    if (mpv) frames_written = mpv->readAudioBuffer((void*)stream, len);
+
+    float volume = 0.0;
+    const float* buf = (float*)stream;
+    for (int i = 0; i < len / 4; ++i) {
+        if (abs(buf[i]) > volume) {
+            volume = abs(buf[i]);
+        }
+    }
 }
 
 /*
@@ -344,10 +348,12 @@ static void overflow_callback(struct SoundIoInStream*) {
     static int count = 0;
     fprintf(stderr, "overflow %d\n", ++count);
 }
+/*
 static void underflow_callback(struct SoundIoOutStream*) {
     static int count = 0;
     fprintf(stderr, "underflow %d\n", ++count);
 }
+*/
 
 void App::initAudio() {
     // Workaround to fix bad audio from input devices
@@ -478,23 +484,31 @@ void App::initAudio() {
 
     if ((err = soundio_outstream_open(outstream))) {
         fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
+        return;
+    }
+
+    int err;
+    if (outstream && (err = soundio_outstream_start(outstream))) {
+        fprintf(stderr, "unable to start output device: %s\n", soundio_strerror(err));
+        return;
     }
     */
 
     // SDL2 audio output
-
     SDL_AudioSpec want, have;
     SDL_zero(want);
     want.freq = 48000;
     want.format = AUDIO_F32;
     want.channels = 2;
-    want.samples = 512;
-    want.callback = sdl_write_callback;
+    want.samples = 1024;
+    want.callback = write_audio_callback;
     out_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     if (!out_device) {
         SDL_Log("Failed to open audio: %s", SDL_GetError());
         return;
     }
+
+    SDL_PauseAudioDevice(out_device, 0); // start audio output
 }
 
 SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, SDL_Color color, const std::string &text ) {
@@ -537,7 +551,7 @@ App::App() {
 
 }
 App::~App() {
-    soundio_instream_pause(instream, true);
+    if (instream) soundio_instream_pause(instream, true);
     // if (outstream) soundio_outstream_pause(outstream, true);
     if (out_device) SDL_CloseAudioDevice(out_device);
     if (mpv) {
@@ -551,11 +565,11 @@ App::~App() {
     SDL_Quit();
     // Pa_Terminate();
     // soundio_ring_buffer_destroy(ring_buffer);
-    soundio_instream_destroy(instream);
-    soundio_device_unref(in_device);
+    if (instream) soundio_instream_destroy(instream);
+    if (in_device) soundio_device_unref(in_device);
     // if (outstream) soundio_outstream_destroy(outstream);
     // if (out_device) soundio_device_unref(out_device);
-    soundio_destroy(soundio);
+    if (soundio) soundio_destroy(soundio);
     // if (yinChannels) delete[] yinChannels;
     if (aubioPitchChannels) {
         del_aubio_pitch(aubioPitchChannels[0]);
@@ -570,6 +584,14 @@ int App::init() {
         return 1;
     }
 
+    if (!SDL_VERSION_ATLEAST(2, 0, 8)) {
+        SDL_Log("SDL version 2.0.8 or greater is required. You have %i.%i.%i", SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
+        return 1;
+    }
+
+    std::cout << "SDL video driver: " << SDL_GetCurrentVideoDriver() << std::endl;
+    std::cout << "SDL audio driver: " << SDL_GetCurrentAudioDriver() << std::endl;
+
     initAudio();
 
     if (TTF_Init() == -1) {
@@ -578,17 +600,19 @@ int App::init() {
     }
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    //SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    //SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
 
     // Don't disable desktop compositing (e.g. KDE Plasma)
     SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
     mainWindow = SDL_CreateWindow("singsing",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         640, 360,
-        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE/*|SDL_WINDOW_ALLOW_HIGHDPI*/);
+        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIDDEN/*|SDL_WINDOW_ALLOW_HIGHDPI*/);
     if (!mainWindow) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -609,10 +633,10 @@ int App::init() {
     }
 
     std::cout << std::endl <<
-                 "GL_VENDOR " << glGetString(GL_VENDOR) << std::endl <<
-                 "GL_VERSION " << glGetString(GL_VERSION) << std::endl <<
-                 "GL_RENDERER " << glGetString(GL_RENDERER) << std::endl <<
-                 "GLSL_VERSION " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl << std::endl;
+        "GL_VENDOR " << glGetString(GL_VENDOR) << std::endl <<
+        "GL_VERSION " << glGetString(GL_VERSION) << std::endl <<
+        "GL_RENDERER " << glGetString(GL_RENDERER) << std::endl <<
+        "GLSL_VERSION " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl << std::endl;
 
     GLCall(glEnable(GL_CULL_FACE));
     GLCall(glDepthMask(GL_FALSE));
@@ -624,6 +648,7 @@ int App::init() {
     GLCall(glClearColor(0.0, 0.0, 0.0, 0.0));
     GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
+    SDL_PumpEvents();
     return 0;
 }
 
@@ -633,15 +658,20 @@ int App::launch() {
     song.parse("../deps/cold-notes.txt");
     std::cout << "Parsed song: " << song.getTitle() << " by " << song.getArtist() << std::endl;
 
+
 #ifdef __linux__
-    auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 18);
+    auto fontFile = "/usr/share/fonts/TTF/DejaVuSans.ttf";
+    auto gFont = TTF_OpenFont(fontFile, 18);
     if (!gFont) {
-        gFont = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18);
+        fontFile = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+        gFont = TTF_OpenFont(fontFile, 18);
     }
 #elif __APPLE__
-    auto gFont = TTF_OpenFont("/Library/Fonts/Arial.ttf", 18);
+    auto fontFile = "/Library/Fonts/Arial.ttf";
+    auto gFont = TTF_OpenFont(fontFile, 18);
 #elif _WIN32
-    auto gFont = TTF_OpenFont("C:\\Windows\\Fonts\\arial.ttf", 18);
+    auto fontFile = "C:\\Windows\\Fonts\\arial.ttf";
+    auto gFont = TTF_OpenFont(fontFile, 18);
 #endif
 
     if (!gFont) {
@@ -671,18 +701,14 @@ int App::launch() {
         "../deps/cold-song.mp3"
     );
 
-    /*
-    int err;
-    if (outstream && (err = soundio_outstream_start(outstream))) {
-        fprintf(stderr, "unable to start output device: %s\n", soundio_strerror(err));
-    }
-    */
-    if (out_device) SDL_PauseAudioDevice(out_device, 0); // start audio output
-
     SDL_Color textColor{255, 255, 255, 255};
     GLuint fpsTexture;
     GLCall(glGenTextures(1, &fpsTexture));
     SDL_Rect textureSize;
+
+    // GLuint vao;
+    // GLCall(glGenVertexArrays(1, &vao));
+    // GLCall(glBindVertexArray(vao));
 
     // This will identify our vertex buffer
     GLuint vertexbuffer;
@@ -698,14 +724,21 @@ int App::launch() {
     bool isrunning = true;
     bool firstFrame = true;
     auto last_time = SDL_GetTicks();
+    std::chrono::system_clock::time_point a = std::chrono::system_clock::now();
+    std::chrono::system_clock::time_point b = std::chrono::system_clock::now();
     while (isrunning) {
+        // SDL_PumpEvents();
         SDL_Event e;
         while (SDL_PollEvent(&e) && isrunning) {
-              if (e.type == SDL_QUIT) {
+            if (e.type == SDL_QUIT) {
                 isrunning = false;
                 break;
-              }
-              mpv->processSDLEvent(&e);
+            } else if (e.type == SDL_WINDOWEVENT) {
+                if (e.window.event == SDL_WINDOWEVENT_EXPOSED) {
+
+                }
+            }
+            mpv->processSDLEvent(&e);
         }
         if (!isrunning) break;
         float framespersecond = fpsupdate();
@@ -718,7 +751,7 @@ int App::launch() {
             if (!isnan(currentNote1)) {
               note = tones[(int)(currentNote1) % 12];
             }
-            textureSize = TextToTexture(fpsTexture, gFont, textColor, (std::string("FPS: ") + std::to_string((int)framespersecond)).c_str());
+            textureSize = TextToTexture(fpsTexture, gFont, textColor, (std::string("FPS: ") + std::to_string((int)round(framespersecond))).c_str());
             last_time = now_time;
             // std::cout << textureSize.w << std::endl;
         }
@@ -740,8 +773,9 @@ int App::launch() {
         GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
         square.use();
-        square.setUniformi("texture", 0);
-        // GLCall(glActiveTexture(GL_TEXTURE0 + 0));
+        square.setUniformi("u_texture", 0);
+        GLCall(glActiveTexture(GL_TEXTURE0 + 0));
+        // GLCall(glBindVertexArray(vao));
         GLCall(glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer));
         GLCall(glEnableVertexAttribArray(square.attribute("position")));
         GLCall(glEnableVertexAttribArray(square.attribute("texcoord")));
@@ -813,11 +847,35 @@ int App::launch() {
         GLCall(glDisableVertexAttribArray(square.attribute("position")));
         GLCall(glDisableVertexAttribArray(square.attribute("texcoord")));
 
+        // GLCall(glBindVertexArray(0));
         // macOS bug workaround, make sure no framebuffer is active
         GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
         SDL_GL_SwapWindow(mainWindow);
-        SDL_Delay(1);
         mpv->reportSwap();
+
+        // On macOS Mojave, moving/resizing window disables vsync
+        // This is required to limit the fps to MAX_FRAMES_PER_SECOND
+        if (MAX_FRAMES_PER_SECOND > 0) {
+            a = std::chrono::system_clock::now();
+            std::chrono::duration<double, std::milli> work_time = a - b;
+
+            if (work_time.count() < 1000.0/MAX_FRAMES_PER_SECOND) {
+                std::chrono::duration<double, std::milli> delta_ms(1000.0/MAX_FRAMES_PER_SECOND - work_time.count());
+                auto delta_ms_duration = std::chrono::duration_cast<std::chrono::milliseconds>(delta_ms);
+                std::this_thread::sleep_for(std::chrono::milliseconds(delta_ms_duration.count()));
+            }
+
+            b = std::chrono::system_clock::now();
+            std::chrono::duration<double, std::milli> sleep_time = b - a;
+        }
+
+        if (firstFrame) {
+            // Fix for macOS Mojave. Show window after
+            // SDL2 has processed events once. Otherwise
+            // shows black window until moved.
+            SDL_ShowWindow(mainWindow);
+            SDL_RaiseWindow(mainWindow);
+        }
         firstFrame = false;
     }
 
