@@ -15,6 +15,7 @@
 #include "util/glprogram.hpp"
 #include "util/glframebuffer.hpp"
 #include "song.hpp"
+#include "font.hpp"
 
 const int ANALYSIS_BUFFER_LENGTH = 2048;
 const int ANALYSIS_HOP_SIZE = ANALYSIS_BUFFER_LENGTH / 4;
@@ -585,15 +586,20 @@ int App::launch() {
     song.parse("../deps/cold-notes.txt");
     std::cout << "Parsed song: " << song.getTitle() << " by " << song.getArtist() << std::endl;
 
+
 #ifdef __linux__
-    auto gFont = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 18);
+    auto fontFile = "/usr/share/fonts/TTF/DejaVuSans.ttf";
+    auto gFont = TTF_OpenFont(fontFile, 18);
     if (!gFont) {
-        gFont = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18);
+        fontFile = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+        gFont = TTF_OpenFont(fontFile, 18);
     }
 #elif __APPLE__
-    auto gFont = TTF_OpenFont("/Library/Fonts/Arial.ttf", 18);
+    auto fontFile = "/Library/Fonts/Arial.ttf";
+    auto gFont = TTF_OpenFont(fontFile, 18);
 #elif _WIN32
-    auto gFont = TTF_OpenFont("C:\\Windows\\Fonts\\arial.ttf", 18);
+    auto fontFile = "C:\\Windows\\Fonts\\arial.ttf";
+    auto gFont = TTF_OpenFont(fontFile, 18);
 #endif
 
     if (!gFont) {
