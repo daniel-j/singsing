@@ -127,14 +127,13 @@ void MPV::processSDLEvent(SDL_Event* event) const {
         // Happens when at least 1 new event is in the mpv event queue.
         else if (event->type == wakeup_on_mpv_events) {
             // Handle all remaining mpv events.
-            while (1) {
+            while (true) {
                 mpv_event *mp_event = mpv_wait_event(mpv, 0);
-                if (mp_event->event_id == MPV_EVENT_NONE)
-                    break;
-                printf("event: %s\n", mpv_event_name(mp_event->event_id));
-                // auto mpv_format = mpv_get_audio_format();
-                // std::cout << " MPV format: " << mpv_format << std::endl;
-                if (strcmp(mpv_event_name(mp_event->event_id), "end-file") == 0) {
+                if (mp_event->event_id == MPV_EVENT_NONE) break;
+
+                std::string event_name = mpv_event_name(mp_event->event_id);
+                std::cout << "mpv event: " << event_name << std::endl;
+                if (event_name == "end-file") {
                     // playback stopped
                 }
             }
@@ -188,6 +187,7 @@ double MPV::getProgressPercent() const {
 }
 
 int MPV::readAudioBuffer(void* buffer, int length) const {
+    if (!mpv) return 0;
     return mpv_audio_callback(mpv, buffer, length);
 }
 

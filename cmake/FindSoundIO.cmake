@@ -1,10 +1,10 @@
-# Copyright (c) 2015 Andrew Kelley
-# This file is MIT licensed.
-# See http://opensource.org/licenses/MIT
-
-# SOUNDIO_FOUND
-# SOUNDIO_INCLUDE_DIR
-# SOUNDIO_LIBRARY
+# - Try to find SoundIO
+# Once done this will define
+#
+#  SOUNDIO_FOUND
+#  SOUNDIO_INCLUDE_DIR
+#  SOUNDIO_LIBRARY
+#
 
 find_path(SOUNDIO_INCLUDE_DIR NAMES soundio/soundio.h)
 

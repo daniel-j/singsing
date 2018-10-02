@@ -1,7 +1,9 @@
-cmake_minimum_required(VERSION 3.2)
-set(CMAKE_CXX_STANDARD 11)
+cmake_minimum_required(VERSION 3.8)
 
-project(singsingplayer)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_COMPILER "clang++")
+
+project(singsingplayer LANGUAGES CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "Building in the source directory is not supported, try building in a 'build' directory.")
@@ -22,7 +24,10 @@ set(OpenGL_GL_PREFERENCE "GLVND")
 
 add_executable(${PROJECT_NAME} ${sources} ${headers})
 
-include_directories("${CMAKE_PREFIX_PATH}/include")
+include_directories(
+    "${CMAKE_PREFIX_PATH}/include"
+    "/usr/local/include"
+)
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
@@ -34,6 +39,7 @@ find_package(SoundIO REQUIRED)
 find_package(Aubio REQUIRED)
 find_package(FFmpeg REQUIRED COMPONENTS AVCODEC AVFORMAT AVUTIL AVFILTER AVDEVICE SWRESAMPLE SWSCALE)
 find_package(MPV REQUIRED)
+find_package(ProjectM)
 
 target_link_libraries(
     ${PROJECT_NAME}
@@ -47,4 +53,5 @@ target_link_libraries(
     ${AUBIO_LIBRARY}
     ${FFMPEG_LIBRARIES}
     ${MPV_LIBRARY}
+    ${PROJECTM_LIBRARY}
 )
