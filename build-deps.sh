@@ -24,7 +24,7 @@ $MACOS && makearg="-j$(sysctl -n hw.ncpu)" || makearg="-j$(nproc)"
 clean_prefix() {
 	rm -rf "$PREFIX"
 	mkdir -pv $PREFIX/{bin,include,lib}
-	cp -f "$SRC/libcwrap.h" "$PREFIX/libcwrap.h"
+	$LINUX && cp -f "$SRC/libcwrap.h" "$PREFIX/libcwrap.h"
 }
 
 build_soundio() {
