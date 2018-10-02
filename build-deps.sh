@@ -27,6 +27,20 @@ clean_prefix() {
 	cp -f "$SRC/libcwrap.h" "$PREFIX/libcwrap.h"
 }
 
+build_soundio() {
+	echo "Building SoundIO"
+	cd "$SRC/soundio"
+	rm -rf build
+	mkdir -p build
+	cd build
+	rm -f CMakeCache.txt
+	export LDFLAGS=-lrt
+	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX"
+	make $makearg
+	make install
+	make clean
+}
+
 build_ftgl() {
 	echo "Building Freetype GL"
 	cd "$SRC/ftgl"
