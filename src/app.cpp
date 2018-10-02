@@ -350,7 +350,12 @@ static void underflow_callback(struct SoundIoOutStream*) {
 }
 
 void App::initAudio() {
-    // hack to unsuspend input devices
+    // Workaround to fix bad audio from input devices
+    // I have an issue with my ZOOM H1 USB mic together with
+    // soundio, which doesn't seem to init properly on pulse.
+    // This wakes up every pulse input device before soundio
+    // starts which seems to do the trick. Another fix is to
+    // keep pavucontrol open in the background.
     std::string sdlAudioDriver = SDL_GetCurrentAudioDriver();
     if (sdlAudioDriver == "pulseaudio") {
         int count = SDL_GetNumAudioDevices(1);
@@ -359,6 +364,8 @@ void App::initAudio() {
             std::cout << "Waking up audio input device " << name << std::endl;
             SDL_AudioSpec want, have;
             SDL_zero(want);
+            want.format = AUDIO_F32;
+            want.samples = 512;
             auto dev = SDL_OpenAudioDevice(name, 1, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
             if (dev) {
                 SDL_PauseAudioDevice(dev, 0);
