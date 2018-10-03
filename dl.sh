@@ -5,7 +5,8 @@ set -e
 . ./env.sh
 
 declare -a deps
-deps+=('soundio|https://github.com/atsushieno/libsoundio/archive/0d27b850453d69a327019fed2961684762249b7e.tar.gz')
+deps+=('glew|https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0.tgz/download')
+deps+=('soundio|https://github.com/andrewrk/libsoundio/archive/7c53dabc6e21d08c68ce6764f3108f6349ced308.tar.gz')
 deps+=('yasm|http://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz')
 deps+=('ffmpeg|https://www.ffmpeg.org/releases/ffmpeg-4.0.2.tar.xz')
 deps+=('mpv|https://github.com/daniel-j/mpv/archive/ao_cb.tar.gz')
