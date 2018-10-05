@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.8)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_COMPILER "clang++")
 
+if(UNIX AND NOT APPLE)
+    set(STATIC_FLAGS "-static-libgcc -static-libstdc++")
+endif()
+
 project(singsingplayer LANGUAGES CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
@@ -42,10 +46,9 @@ find_package(FFmpeg REQUIRED COMPONENTS AVCODEC AVFORMAT AVUTIL AVFILTER AVDEVIC
 find_package(MPV REQUIRED)
 # find_package(ProjectM)
 
-
 target_link_libraries(
     ${PROJECT_NAME}
-    -static-libgcc -static-libstdc++
+    ${STATIC_FLAGS}
     ${OPENGL_LIBRARY}
     ${GLEW_LIBRARY}
     ${SDL2_LIBRARY}
