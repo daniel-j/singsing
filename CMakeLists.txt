@@ -13,7 +13,6 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "Building in the source directory is not supported, try building in a 'build' directory.")
 endif()
 
-set(CMAKE_SKIP_RPATH TRUE)
 set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/prefix" CACHE PATH "Path to prefix")
 set(CMAKE_FIND_ROOT_PATH "${CMAKE_PREFIX_PATH}")
 
@@ -63,3 +62,12 @@ target_link_libraries(
 )
 
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
+
+# Build for macOS (unfinished)
+set(CPACK_GENERATOR "Bundle")
+set(CPACK_BUNDLE_NAME "singsing")
+set(CPACK_BUNDLE_PLIST "${CMAKE_SOURCE_DIR}/platform/macos/Info.plist")
+set(CPACK_BUNDLE_ICON "/dev/null")
+
+include(CPACK)
+

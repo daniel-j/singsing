@@ -20,6 +20,7 @@ export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
 export CC="clang"
 export CXX="clang++"
+export BUILD_TYPE=Debug
 
 $LINUX && export CC="$CC"
 $LINUX && export CXX="$CXX -static-libgcc -static-libstdc++"
@@ -86,7 +87,8 @@ build_ftgl() {
 	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
 		-Dfreetype-gl_BUILD_APIDOC=OFF \
 		-Dfreetype-gl_BUILD_DEMOS=OFF \
-		-Dfreetype-gl_BUILD_TESTS=OFF
+		-Dfreetype-gl_BUILD_TESTS=OFF \
+		-DCMAKE_BUILD_TYPE=MinSizeRel
 	make $makearg
 	make install
 	install -v makefont "$PREFIX/bin/makefont"
@@ -126,7 +128,7 @@ build_soundio() {
 	mkdir -p build
 	cd build
 	rm -f CMakeCache.txt
-	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
+	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_SKIP_RPATH=TRUE -DBUILD_STATIC_LIBS=NO -DCMAKE_BUILD_TYPE=MinSizeRel
 	make $makearg
 	make install
 	make clean
@@ -213,7 +215,7 @@ build_mpv() {
 		--disable-tv-v4l2 --disable-libv4l2 --disable-audio-input \
 		--disable-apple-remote --disable-macos-touchbar --disable-macos-cocoa-cb \
 		--disable-caca --disable-jpeg --disable-vulkan --disable-xv \
-		--disable-lua --enable-sdl2 \
+		--disable-lua --disable-lcms2 --enable-sdl2 \
 		build install distclean
 	# --disable-cplayer
 }
@@ -240,7 +242,7 @@ build_singsing() {
 	mkdir -p "$buildpath"
 	cd "$buildpath"
 	# rm -f CMakeCache.txt
-	cmake .. -DCMAKE_PREFIX_PATH="$PREFIX" -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
+	cmake .. -DCMAKE_PREFIX_PATH="$PREFIX" -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_INSTALL_RPATH="$PREFIX/lib" -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 	make $makearg
 	make install
 }
@@ -286,6 +288,12 @@ elif [ "$1" == "run" ]; then
 	echo "==> Running singsing"
 	tput sgr0
 	$CROSSWIN && exec wine prefixwin/bin/singsing.exe "$@" || LD_LIBRARY_PATH=prefix/lib exec prefix/bin/singsing "$@"
+
+elif [ "$1" == "release" ]; then
+	export BUILD_TYPE=Release
+	# ensure a clean build
+	$CROSSWIN && rm -rf buildwin || rm -rf build
+	build_singsing
 
 elif [ ! -z "$1" ]; then
 	build_$1
