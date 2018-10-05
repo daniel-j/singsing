@@ -1,9 +1,4 @@
-# Sample toolchain file for building for Windows from an Ubuntu Linux system.
-#
-# Typical usage:
-#    *) install cross compiler: `sudo apt-get install mingw-w64 g++-mingw-w64`
-#    *) cd build
-#    *) cmake -DCMAKE_TOOLCHAIN_FILE=~/Toolchain-Ubuntu-mingw64.cmake ..
+# Toolchain file for building for Windows from a Linux system.
 
 set(CMAKE_SYSTEM_NAME Windows)
 set(TOOLCHAIN_PREFIX x86_64-w64-mingw32)
@@ -25,3 +20,5 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/prefixwin")
+
+SET(CMAKE_EXE_LINKER_FLAGS "-static -static-libgcc -static-libstdc++")

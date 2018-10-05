@@ -77,4 +77,4 @@ deps/
 prefix/
 prefixwin/
 build/
-build-*/
+buildwin/

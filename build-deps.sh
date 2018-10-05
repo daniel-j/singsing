@@ -39,11 +39,47 @@ clean_prefix() {
 build_glew() {
 	echo "Building GLEW"
 	cd "$SRC/glew"
-	$CROSSWIN && SYSTEM="SYSTEM=linux-mingw64"
-	$CROSSWIN && LDFLAGSEXTRA="-nostdlib -L/usr/$MINGW/lib"
-	make CC="$CC" HOST="$MINGW" LIBDIR="$PREFIX/lib" LDFLAGS.EXTRA="$LDFLAGSEXTRA" GLEW_DEST="$PREFIX" GLEW_PREFIX="$PREFIX" $SYSTEM glew.lib $makearg
-	make HOST="$MINGW" LIBDIR="$PREFIX/lib" GLEW_DEST="$PREFIX" GLEW_PREFIX="$PREFIX" $SYSTEM install
-	make HOST="$MINGW" LIBDIR="$PREFIX/lib" GLEW_DEST="$PREFIX" GLEW_PREFIX="$PREFIX" $SYSTEM distclean
+	if $CROSSWIN; then
+		make SYSTEM=mingw \
+			 CC="$MINGW-gcc" \
+			 AR="$MINGW-ar" ARFLAGS=crs \
+			 RANLIB="$MINGW-ranlib" \
+			 STRIP="$MINGW-strip" \
+			 LD="$MINGW-gcc" \
+			 HOST="$HOST" \
+			 LIBDIR="$PREFIX/lib" \
+			 LDFLAGS.EXTRA="-L/usr/$MINGW/lib -nostdlib" \
+			 GLEW_DEST="$PREFIX" GLEW_PREFIX="$PREFIX" \
+			 install $makearg
+		make LIBDIR="$PREFIX/lib" GLEW_DEST="$PREFIX" GLEW_PREFIX="$PREFIX" distclean
+	else
+		make LIBDIR="$PREFIX/lib" \
+			 GLEW_DEST="$PREFIX" GLEW_PREFIX="$PREFIX" \
+			 install $makearg
+		make LIBDIR="$PREFIX/lib" GLEW_DEST="$PREFIX" GLEW_PREFIX="$PREFIX" distclean
+	fi
+}
+
+build_sdl2() {
+	echo "Building SDL2"
+	cd "$SRC/sdl2"
+	bash ./autogen.sh || true
+	# rm -rf build
+	mkdir -p build
+	cd build
+	../configure --prefix="$PREFIX" --host="$HOST" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" LDFLAGS="$LDFLAGS" CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" \
+		--enable-sdl-dlopen \
+		--enable-alsa-shared --enable-pulseaudio-shared \
+		--enable-jack-shared --enable-sndio-shared \
+		--disable-nas --disable-esd --disable-arts --disable-diskaudio \
+		--enable-video-wayland --enable-wayland-shared --enable-x11-shared \
+		--enable-ibus --enable-fcitx --enable-ime \
+		--disable-rpath
+	make $makearg
+	make install
+	make distclean
+	# cmake ../sdl2 -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
+	# make clean
 }
 
 build_soundio() {
@@ -139,7 +175,7 @@ build_mpv() {
 	./bootstrap.py
 	$CROSSWIN && export DEST_OS="win32"
 	$CROSSWIN && export TARGET="$MINGW"
-	PKG_CONFIG_PATH="$PKG_CONFIG_PATH" DEST_OS="$DEST_OS" TARGET="$TARGET" ./waf configure --prefix="$PREFIX" --disable-cplayer --enable-libmpv-shared \
+	PKG_CONFIG_PATH="$PKG_CONFIG_PATH" DEST_OS="$DEST_OS" TARGET="$TARGET" CC="$CC -static-libgcc" ./waf configure --prefix="$PREFIX" --enable-libmpv-shared \
 		--disable-manpage-build --disable-android --disable-javascript \
 		--disable-libass --disable-libass-osd --disable-libbluray \
 		--disable-vapoursynth --disable-vapoursynth-lazy --disable-libarchive \
@@ -147,18 +183,32 @@ build_mpv() {
 		--disable-tv-v4l2 --disable-libv4l2 --disable-audio-input \
 		--disable-apple-remote --disable-macos-touchbar --disable-macos-cocoa-cb \
 		--disable-caca --disable-jpeg --disable-vulkan --disable-xv \
-		--disable-lua \
+		--disable-lua --enable-sdl2 \
 		build install distclean
+	# --disable-cplayer
 }
 
 build_projectm() {
 	echo "Building projectM"
 	cd "$SRC/projectm"
-	./configure --prefix="$PREFIX" --host="$MINGW" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
+	./configure --prefix="$PREFIX" --host="$HOST" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
 		--disable-rpath --disable-qt --disable-sdl --disable-emscripten --disable-gles
 	make $makearg
 	make install
 	make clean
+}
+
+build_singsing() {
+	echo "Building singsing"
+	cd "$root"
+	export buildpath=build
+	$CROSSWIN && export buildpath=buildwin
+	mkdir -p "$buildpath"
+	cd "$buildpath"
+	# rm -f CMakeCache.txt
+	cmake .. -DCMAKE_PREFIX_PATH="$PREFIX" -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
+	make $makearg
+	make install
 }
 
 # START OF BUILD PROCESS
