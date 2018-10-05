@@ -20,6 +20,7 @@
 #include "util/glutils.hpp"
 #include "util/glprogram.hpp"
 #include "util/glframebuffer.hpp"
+#include "projectmrenderer.hpp"
 #include "mpv.hpp"
 #include "song.hpp"
 #include "font.hpp"

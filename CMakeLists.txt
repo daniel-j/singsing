@@ -43,7 +43,7 @@ find_package(SoundIO REQUIRED)
 find_package(Aubio REQUIRED)
 find_package(FFmpeg REQUIRED COMPONENTS AVCODEC AVFORMAT AVUTIL AVFILTER AVDEVICE SWRESAMPLE SWSCALE)
 find_package(MPV REQUIRED)
-# find_package(ProjectM)
+find_package(ProjectM)
 
 target_link_libraries(
     ${PROJECT_NAME}
@@ -58,7 +58,7 @@ target_link_libraries(
     ${AUBIO_LIBRARY}
     ${FFMPEG_LIBRARY}
     ${MPV_LIBRARY}
-    # ${PROJECTM_LIBRARY}
+    ${PROJECTM_LIBRARY}
 )
 
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
