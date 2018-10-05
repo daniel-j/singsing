@@ -7,7 +7,7 @@ if(UNIX AND NOT APPLE)
     set(STATIC_FLAGS "-static-libgcc -static-libstdc++")
 endif()
 
-project(singsingplayer LANGUAGES CXX)
+project(singsing LANGUAGES CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "Building in the source directory is not supported, try building in a 'build' directory.")

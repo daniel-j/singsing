@@ -428,9 +428,9 @@ void App::initAudio() {
             want.samples = 2048;
             auto dev = SDL_OpenAudioDevice(name, 1, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
             if (dev) {
-                SDL_PauseAudioDevice(dev, 0);
+                SDL_PauseAudioDevice(dev, false);
                 SDL_Delay(1000);
-                SDL_PauseAudioDevice(dev, 1);
+                SDL_PauseAudioDevice(dev, true);
                 SDL_ClearQueuedAudio(dev);
                 SDL_CloseAudioDevice(dev);
             }
@@ -462,7 +462,7 @@ void App::initAudio() {
         return;
     }
 
-    SDL_PauseAudioDevice(out_device_sdl, 0); // start audio output
+    SDL_PauseAudioDevice(out_device_sdl, false); // start audio output
 #else
     auto output_count = soundio_output_device_count(soundio);
     auto default_output = soundio_default_output_device_index(soundio);

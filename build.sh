@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-
+#
+# Usage:
+#   ./build.sh all               # cleans and builds everything
+#   ./build.sh <component>       # builds a single component
+#   ./build.sh                   # builds just the main program
+#   ./build.sh run               # runs the program
 set -e
 
 . ./env.sh
@@ -13,8 +18,11 @@ $CROSSWIN && export PREFIX="$root/prefixwin"
 export PATH="$PREFIX/bin:$PATH"
 export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
-export CC="gcc"
-export CXX="g++"
+export CC="clang"
+export CXX="clang++"
+
+$LINUX && export CC="$CC -static-libgcc"
+$LINUX && export CXX="$CXX -static-libgcc -static-libstdc++"
 
 # $LINUX && [ "$CROSSWIN" == "false" ] && CC="$CC -U_FORTIFY_SOURCE -fno-stack-protector -include $PREFIX/libcwrap.h"
 # $LINUX && [ "$CROSSWIN" == "false" ] && CXX="$CXX -U_FORTIFY_SOURCE -fno-stack-protector -D_GLIBCXX_USE_CXX11_ABI=0 -include $PREFIX/libcwrap.h"
@@ -32,12 +40,17 @@ $MACOS && makearg="-j$(sysctl -n hw.ncpu)" || makearg="-j$(nproc)"
 $LINUX && [ "$CROSSWIN" == "false" ] && cp -f "$SRC/libcwrap.h" "$PREFIX/libcwrap.h"
 
 clean_prefix() {
+	tput setaf 10 && tput bold
+	echo "==> Cleaning prefix"
+	tput sgr0
 	rm -rf "$PREFIX"
 	mkdir -pv $PREFIX/{bin,include,lib,share}
 }
 
 build_glew() {
-	echo "Building GLEW"
+	tput setaf 10 && tput bold
+	echo "==> Building GLEW"
+	tput sgr0
 	cd "$SRC/glew"
 	if $CROSSWIN; then
 		make SYSTEM=mingw \
@@ -60,8 +73,28 @@ build_glew() {
 	fi
 }
 
+build_ftgl() {
+	tput setaf 10 && tput bold
+	echo "==> Building Freetype-GL"
+	tput sgr0
+	cd "$SRC/ftgl"
+	mkdir -p build
+	cd build
+	rm -f CMakeCache.txt
+	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+		-Dfreetype-gl_BUILD_APIDOC=OFF \
+		-Dfreetype-gl_BUILD_DEMOS=OFF \
+		-Dfreetype-gl_BUILD_TESTS=OFF
+	make $makearg
+	make install
+	install -v makefont "$PREFIX/bin/makefont"
+	make clean
+}
+
 build_sdl2() {
-	echo "Building SDL2"
+	tput setaf 10 && tput bold
+	echo "==> Building SDL2"
+	tput sgr0
 	cd "$SRC/sdl2"
 	bash ./autogen.sh || true
 	# rm -rf build
@@ -83,7 +116,9 @@ build_sdl2() {
 }
 
 build_soundio() {
-	echo "Building SoundIO"
+	tput setaf 10 && tput bold
+	echo "==> Building SoundIO"
+	tput sgr0
 	cd "$SRC/soundio"
 	rm -rf build
 	mkdir -p build
@@ -96,7 +131,9 @@ build_soundio() {
 }
 
 build_aubio() {
-	echo "Building Aubio"
+	tput setaf 10 && tput bold
+	echo "==> Building Aubio"
+	tput sgr0
 	cd "$SRC/aubio"
 	./scripts/get_waf.sh
 	$CROSSWIN && export TARGET=win64
@@ -108,25 +145,11 @@ build_aubio() {
 		build install distclean --testcmd='echo %s'
 }
 
-build_fgl() {
-	echo "Building Freetype GL"
-	cd "$SRC/ftgl"
-	mkdir -p build
-	cd build
-	rm -f CMakeCache.txt
-	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
-		-Dfreetype-gl_BUILD_APIDOC=OFF \
-		-Dfreetype-gl_BUILD_DEMOS=OFF \
-		-Dfreetype-gl_BUILD_TESTS=OFF
-	make $makearg
-	make install
-	install -v makefont "$PREFIX/bin/makefont"
-	make clean
-}
-
 # yasm shouldn't be cross-compiled
 build_yasm() {
-	echo "Building Yasm"
+	tput setaf 10 && tput bold
+	echo "==> Building Yasm"
+	tput sgr0
 	cd "$SRC/yasm"
 	CC="" CXX="" ./configure --prefix="$PREFIX"
 	make $makearg
@@ -135,8 +158,11 @@ build_yasm() {
 }
 
 build_ffmpeg() {
-	echo "Building FFmpeg"
+	tput setaf 10 && tput bold
+	echo "==> Building FFmpeg"
+	tput sgr0
 	cd "$SRC/ffmpeg"
+	echo "Configuring... (this takes a while)"
 	$CROSSWIN && export CROSS="--arch=x86 --target-os=mingw32 --cross-prefix=$MINGW- --enable-cross-compile"
 	./configure --prefix="$PREFIX" \
 		--cc="$CC" \
@@ -170,12 +196,14 @@ build_ffmpeg() {
 }
 
 build_mpv() {
-	echo "Building MPV"
+	tput setaf 10 && tput bold
+	echo "==> Building MPV"
+	tput sgr0
 	cd "$SRC/mpv"
 	./bootstrap.py
 	$CROSSWIN && export DEST_OS="win32"
 	$CROSSWIN && export TARGET="$MINGW"
-	PKG_CONFIG_PATH="$PKG_CONFIG_PATH" DEST_OS="$DEST_OS" TARGET="$TARGET" CC="$CC -static-libgcc" ./waf configure --prefix="$PREFIX" --enable-libmpv-shared \
+	PKG_CONFIG_PATH="$PKG_CONFIG_PATH" DEST_OS="$DEST_OS" TARGET="$TARGET" CC="$CC" ./waf configure --prefix="$PREFIX" --enable-libmpv-shared \
 		--disable-manpage-build --disable-android --disable-javascript \
 		--disable-libass --disable-libass-osd --disable-libbluray \
 		--disable-vapoursynth --disable-vapoursynth-lazy --disable-libarchive \
@@ -189,7 +217,9 @@ build_mpv() {
 }
 
 build_projectm() {
-	echo "Building projectM"
+	tput setaf 10 && tput bold
+	echo "==> Building projectM"
+	tput sgr0
 	cd "$SRC/projectm"
 	./configure --prefix="$PREFIX" --host="$HOST" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
 		--disable-rpath --disable-qt --disable-sdl --disable-emscripten --disable-gles
@@ -199,7 +229,9 @@ build_projectm() {
 }
 
 build_singsing() {
-	echo "Building singsing"
+	tput setaf 10 && tput bold
+	echo "==> Building singsing"
+	tput sgr0
 	cd "$root"
 	export buildpath=build
 	$CROSSWIN && export buildpath=buildwin
@@ -214,25 +246,48 @@ build_singsing() {
 # START OF BUILD PROCESS
 
 if [ "$1" == "all" ]; then
-	echo "Building all dependencies"
+	tput setaf 10 && tput bold
+	echo "==> Building everything"
+	tput sgr0
+
 	clean_prefix
 
 	build_glew
 
+	# build_freetype
+	# build_ftgl
+
+	build_sdl2
+
 	build_soundio
 	build_aubio
-
-	# build_fgl
 
 	build_yasm
 	build_ffmpeg
 
 	build_mpv
 
+	build_projectm
+
+	touch "$PREFIX/built_libs"
+
+	# ensure a clean build
+	$CROSSWIN && rm -rf buildwin || rm -rf build
+
+	build_singsing
+
+elif [ "$1" == "run" ]; then
+	build_singsing
+	cd "$root"
+	tput setaf 10 && tput bold
+	shift
+	echo "==> Running singsing"
+	tput sgr0
+	$CROSSWIN && exec wine prefixwin/bin/singsing.exe "$@" || LD_LIBRARY_PATH=prefix/lib exec prefix/bin/singsing "$@"
 
 elif [ ! -z "$1" ]; then
-	echo "Building dependency $1"
 	build_$1
+else
+	# no arguments: rebuild
+	build_singsing
 fi
-
-touch "$PREFIX/built_libs"
