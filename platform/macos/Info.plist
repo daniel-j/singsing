@@ -5,7 +5,7 @@
         <key>CFBundleDisplayName</key>
         <string>singsing</string>
         <key>CFBundleExecutable</key>
-        <string>run.sh</string>
+        <string>singsing</string>
         <key>CFBundleInfoDictionaryVersion</key>
         <string>6.0</string>
         <key>CFBundleName</key>

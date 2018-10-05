@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_COMPILER "clang++")
 
 if(UNIX AND NOT APPLE)
-    set(STATIC_FLAGS "-static-libgcc -static-libstdc++")
+    set(STATIC_FLAGS "-static-libgcc -static-libstdc++ -static-libc++")
 endif()
 
 project(singsing LANGUAGES CXX)
@@ -61,7 +61,10 @@ target_link_libraries(
     ${PROJECTM_LIBRARY}
 )
 
-install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
+install(
+    TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION bin
+)
 
 # Build for macOS (unfinished)
 set(CPACK_GENERATOR "Bundle")
