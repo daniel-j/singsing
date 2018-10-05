@@ -37,6 +37,8 @@ $CROSSWIN && export TOOLCHAIN="$root/cmake/toolchain-mingw64.cmake"
 # multicore compilation
 $MACOS && makearg="-j$(sysctl -n hw.ncpu)" || makearg="-j$(nproc)"
 
+mkdir -pv $PREFIX/{bin,include,lib,share}
+
 $LINUX && [ "$CROSSWIN" == "false" ] && cp -f "$SRC/libcwrap.h" "$PREFIX/libcwrap.h"
 
 clean_prefix() {
