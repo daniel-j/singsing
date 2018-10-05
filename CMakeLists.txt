@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_COMPILER "clang++")
 
 if(UNIX AND NOT APPLE)
-    set(STATIC_FLAGS "-static-libgcc -static-libstdc++ -static-libc++")
+    set(STATIC_FLAGS "-static-libgcc -static-libstdc++")
 endif()
 
 project(singsing LANGUAGES CXX)
@@ -66,11 +66,12 @@ install(
     RUNTIME DESTINATION bin
 )
 
-# Build for macOS (unfinished)
-set(CPACK_GENERATOR "Bundle")
-set(CPACK_BUNDLE_NAME "singsing")
-set(CPACK_BUNDLE_PLIST "${CMAKE_SOURCE_DIR}/platform/macos/Info.plist")
-set(CPACK_BUNDLE_ICON "/dev/null")
+if(APPLE)
+    # Build for macOS (unfinished)
+    set(CPACK_GENERATOR "Bundle")
+    set(CPACK_BUNDLE_NAME "singsing")
+    set(CPACK_BUNDLE_PLIST "${CMAKE_SOURCE_DIR}/platform/macos/Info.plist")
+    set(CPACK_BUNDLE_ICON "/dev/null")
 
-include(CPACK)
-
+    include(CPACK)
+endif(APPLE)
