@@ -128,7 +128,9 @@ build_soundio() {
 	mkdir -p build
 	cd build
 	rm -f CMakeCache.txt
-	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_SKIP_RPATH=TRUE -DBUILD_STATIC_LIBS=NO -DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_TESTS=NO # tests require gcov
+	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+		-DCMAKE_MACOSX_RPATH=0 -DBUILD_STATIC_LIBS=NO \
+		-DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_TESTS=NO # tests require gcov
 	make $makearg
 	make install
 	make clean
