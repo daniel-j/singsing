@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+#
+# based on the script from dockercross
+#
+
+set -e
 
 DEFAULT_DOCKCROSS_IMAGE=ubuntu:16.04
 
@@ -30,25 +35,11 @@ command:update-image() {
 }
 
 help:update-image() {
-    echo Pull the latest $FINAL_IMAGE .
-}
-
-command:update-script() {
-    if cmp -s <( docker run --rm $FINAL_IMAGE ) $0; then
-        echo $0 is up to date
-    else
-        echo -n Updating $0 '... '
-        docker run --rm $FINAL_IMAGE > $0 && echo ok
-    fi
-}
-
-help:update-image() {
-    echo Update $0 from $FINAL_IMAGE .
+    echo Pull the latest $FINAL_IMAGE
 }
 
 command:update() {
     command:update-image
-    command:update-script
 }
 
 help:update() {
@@ -67,21 +58,20 @@ command:help() {
         fi
     else
         cat >&2 <<ENDHELP
-Usage: dockcross [options] [--] command [args]
+Usage: run [options] [--] command [args]
 
-By default, run the given *command* in an dockcross Docker container.
+By default, run the given *command* in a Docker container.
 
 The *options* can be one of:
 
     --args|-a           Extra args to the *docker run* command
-    --image|-i          Docker cross-compiler image to use
+    --image|-i          Docker image image to use
     --config|-c         Bash script to source before running this script
 
 
 Additionally, there are special update commands:
 
     update-image
-    update-script
     update
 
 For update command help use: $0 help <command>
@@ -116,7 +106,7 @@ while [[ $# != 0 ]]; do
             ARG_IMAGE="$2"
             shift 2
             ;;
-        update|update-image|update-script)
+        update|update-image)
             special_update_command=$1
             break
             ;;
@@ -158,11 +148,6 @@ if [ "$special_update_command" != "" ]; then
 
         update-image)
             command:update-image
-            exit $?
-            ;;
-
-        update-script)
-            command:update-script
             exit $?
             ;;
 
@@ -216,40 +201,11 @@ fi
 # Now, finally, run the command in a container
 #
 tty -s && TTY_ARGS=-ti || TTY_ARGS=
-CONTAINER_NAME=dockcross_$RANDOM
-docker run $TTY_ARGS --name $CONTAINER_NAME \
+CONTAINER_NAME=singsing_$RANDOM
+exec docker run --rm $TTY_ARGS --name "$CONTAINER_NAME" \
     -v "$HOST_PWD":/work \
     $HOST_VOLUMES \
     "${USER_IDS[@]}" \
     -w /work \
     $FINAL_ARGS \
     $FINAL_IMAGE ./docker/entrypoint.sh "$@"
-run_exit_code=$?
-
-# Attempt to delete container
-rm_output=$(docker rm -f $CONTAINER_NAME 2>&1)
-rm_exit_code=$?
-if [[ $rm_exit_code != 0 ]]; then
-  if [[ "$CIRCLECI" == "true" ]] && [[ $rm_output == *"Driver btrfs failed to remove"* ]]; then
-    : # Ignore error because of https://circleci.com/docs/docker-btrfs-error/
-  else
-    echo "$rm_output"
-    exit $rm_exit_code
-  fi
-fi
-
-exit $run_exit_code
-
-################################################################################
-#
-# This image is not intended to be run manually.
-#
-# To create a dockcross helper script for the
-# dockcross/linux-armv7 image, run:
-#
-# docker run --rm dockcross/linux-armv7 > dockcross-linux-armv7
-# chmod +x dockcross-linux-armv7
-#
-# You may then wish to move the dockcross script to your PATH.
-#
-################################################################################
