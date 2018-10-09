@@ -15,18 +15,17 @@ endif()
 
 set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/prefix" CACHE PATH "Path to prefix")
 set(CMAKE_FIND_ROOT_PATH "${CMAKE_PREFIX_PATH}")
-
-file(GLOB_RECURSE sources
-    ${CMAKE_SOURCE_DIR}/src/*.cpp
-)
-file(GLOB_RECURSE headers
-    ${CMAKE_SOURCE_DIR}/src/*.hpp
-)
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 set(OpenGL_GL_PREFERENCE "GLVND")
 
-add_executable(${PROJECT_NAME} ${sources} ${headers})
+file(GLOB sources
+    ${CMAKE_SOURCE_DIR}/src/base/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/lib/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/*.cpp
+)
+
+add_executable(${PROJECT_NAME} ${sources})
 
 include_directories(
     "${CMAKE_PREFIX_PATH}/include"
