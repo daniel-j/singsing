@@ -847,7 +847,7 @@ int App::launch() {
 
         if (firstFrame || SDL_TICKS_PASSED(now_time, last_time + 500)) {
             std::string note = "";
-            if (!isnan(currentNote1)) {
+            if (!std::isnan(currentNote1)) {
               note = tones[(int)(currentNote1) % 12];
             }
             // textureSize = TextToTexture(fpsTexture, gFont, textColor, (std::string("FPS: ") + std::to_string((int)round(framespersecond))).c_str());

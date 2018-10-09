@@ -18,8 +18,8 @@ $CROSSWIN && export PREFIX="$root/prefixwin"
 export PATH="$PREFIX/bin:$PATH"
 export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
-export CC="clang"
-export CXX="clang++"
+export CC="gcc"
+export CXX="g++"
 export BUILD_TYPE=Debug
 
 # $LINUX && export CC="$CC"
@@ -107,11 +107,11 @@ build_sdl2() {
 	../configure --prefix="$PREFIX" --host="$HOST" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" LDFLAGS="$LDFLAGS" CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" \
 		--enable-sdl-dlopen \
 		--enable-alsa-shared --enable-pulseaudio-shared \
-		--enable-jack-shared --enable-sndio-shared \
+		--enable-jack-shared --disable-sndio --enable-sndio-shared \
 		--disable-nas --disable-esd --disable-arts --disable-diskaudio \
 		--enable-video-wayland --enable-wayland-shared --enable-x11-shared \
 		--enable-ibus --enable-fcitx --enable-ime \
-		--disable-rpath
+		--disable-rpath --disable-vulkan
 	make $makearg
 	make install
 	make distclean
@@ -128,7 +128,9 @@ build_soundio() {
 	mkdir -p build
 	cd build
 	rm -f CMakeCache.txt
-	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_SKIP_RPATH=TRUE -DBUILD_STATIC_LIBS=NO -DCMAKE_BUILD_TYPE=MinSizeRel
+	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+		-DCMAKE_MACOSX_RPATH=0 -DBUILD_STATIC_LIBS=NO \
+		-DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_TESTS=NO # tests require gcov
 	make $makearg
 	make install
 	make clean
@@ -139,7 +141,6 @@ build_aubio() {
 	echo "==> Building Aubio"
 	tput sgr0
 	cd "$SRC/aubio"
-	./scripts/get_waf.sh
 	$CROSSWIN && export TARGET=win64
 	PKG_CONFIG_PATH="$PKG_CONFIG_PATH" ./waf configure --prefix="$PREFIX" --with-target-platform="$TARGET" \
 		--disable-fftw3f --disable-fftw3 --disable-avcodec --disable-jack \
@@ -151,6 +152,7 @@ build_aubio() {
 
 # yasm shouldn't be cross-compiled
 build_yasm() {
+	$CROSSWIN && return
 	tput setaf 10 && tput bold
 	echo "==> Building Yasm"
 	tput sgr0
@@ -225,7 +227,6 @@ build_projectm() {
 	echo "==> Building projectM"
 	tput sgr0
 	cd "$SRC/projectm"
-	autoreconf
 	./configure --prefix="$PREFIX" --host="$HOST" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" CXXFLAGS="$CXXFLAGS" \
 		--disable-rpath --disable-qt --disable-sdl --disable-emscripten --disable-gles
 	make $makearg
@@ -267,7 +268,7 @@ if [ "$1" == "all" ]; then
 	build_soundio
 	build_aubio
 
-	build_yasm
+	# build_yasm
 	build_ffmpeg
 
 	build_mpv
