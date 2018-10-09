@@ -293,7 +293,7 @@ static void read_callback(struct SoundIoInStream *instream, int frame_count_min,
     //std::cout << std::endl;
 }
 
-static void write_audio_callback(void* userdata, Uint8* stream, int len) {
+static void write_audio_callback(void*, Uint8* stream, int len) {
     SDL_memset(stream, 0, len);
     int frames_written = 0;
     if (mpv) frames_written = mpv->readAudioBuffer((void*)stream, len);
@@ -302,13 +302,14 @@ static void write_audio_callback(void* userdata, Uint8* stream, int len) {
 
     float volume = 0.0;
     const float* buf = (float*)stream;
-    for (int i = 0; i < len / sizeof(float); i+=2) {
+    float monoBuffer[2048]{0};
+    for (size_t i = 0; i < len / sizeof(float); i++) {
         if (abs(buf[i]) > volume) {
             volume = abs(buf[i]);
         }
+        monoBuffer[i / 2] += buf[i] / 2.0;
     }
-    float* monoBuffer = new float[len / 4 / 2];
-    mviz.do_fft((float*)stream);
+    mviz.do_fft(monoBuffer);
 }
 
 static void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max) {
@@ -362,7 +363,7 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
         frames_left = fmin(frames_left, mpv_frames);
         std::cout << frames_left << std::endl;
     } else {
-        
+
     }
 
     for (;;) {
