@@ -24,6 +24,7 @@
 #include "mpv.hpp"
 #include "song.hpp"
 #include "font.hpp"
+#include "musicvisualizer.hpp"
 
 //#ifndef _WIN32
     #define SDL_AUDIO_OUTPUT 1
@@ -51,6 +52,7 @@ static struct SoundIoOutStream *outstream = nullptr;
 static SDL_AudioDeviceID out_device_sdl = 0;
 static MPV* mpv = nullptr;
 static std::vector<float> mpv_audio_buffer;
+static MusicVisualizer mviz;
 
 static std::string tones[]{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -305,6 +307,8 @@ static void write_audio_callback(void* userdata, Uint8* stream, int len) {
             volume = abs(buf[i]);
         }
     }
+    float* monoBuffer = new float[len / 4 / 2];
+    mviz.do_fft((float*)stream);
 }
 
 static void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max) {
