@@ -51,6 +51,7 @@ static struct SoundIoOutStream *outstream = nullptr;
 static SDL_AudioDeviceID out_device_sdl = 0;
 static MPV* mpv = nullptr;
 static std::vector<float> mpv_audio_buffer;
+static ProjectMRenderer* projectm = nullptr;
 
 static std::string tones[]{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -193,6 +194,8 @@ void checkRingbuffer(App* app, int bytes_per_frame) {
     float pitch2, probability2, note2;
 
     float *read_ptr = (float*)soundio_ring_buffer_read_ptr(ring_buffer);
+
+    // projectm->processAudio(read_ptr, ANALYSIS_HOP_SIZE);
 
     app->analyzeAudio(0, read_ptr, &pitch1, &probability1);
     app->analyzeAudio(1, read_ptr, &pitch2, &probability2);
@@ -633,6 +636,7 @@ App::App() {
 
 }
 App::~App() {
+    if (projectm) delete projectm;
     if (instream) soundio_instream_pause(instream, true);
     if (outstream) soundio_outstream_pause(outstream, true);
     if (out_device_sdl) {
@@ -689,11 +693,11 @@ int App::init() {
         return 1;
     }*/
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
     // SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-    //SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    //SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
 
     // Don't disable desktop compositing (e.g. KDE Plasma)
     SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
@@ -739,6 +743,10 @@ int App::init() {
     GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
     SDL_PumpEvents();
+
+    // projectm = new ProjectMRenderer("./projectm.conf", 0);
+    // projectm->init();
+
     return 0;
 }
 
@@ -797,9 +805,9 @@ int App::launch() {
     GLCall(glGenTextures(1, &fpsTexture));
     SDL_Rect textureSize;
 
-    // GLuint vao;
-    // GLCall(glGenVertexArrays(1, &vao));
-    // GLCall(glBindVertexArray(vao));
+    GLuint vao;
+    GLCall(glGenVertexArrays(1, &vao));
+    GLCall(glBindVertexArray(vao));
 
     // This will identify our vertex buffer
     GLuint vertexbuffer;
@@ -809,7 +817,7 @@ int App::launch() {
     GLCall(glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW));
 
     Program square;
-    square.load("shaders/vert.glsl", "shaders/frag.glsl");
+    square.load("shaders/vert.330.glsl", "shaders/frag.330.glsl");
 
     fpsinit();
     bool isrunning = true;
@@ -858,6 +866,9 @@ int App::launch() {
         GLCall(mpv->render(winWidth, winHeight, mpv_fbo.getHandle(), 0));
         GLCall(glEnable(GL_CULL_FACE));
 
+        // projectm->resize(winWidth, winHeight);
+        // projectm->renderFrame();
+
         // restore state
         GLCall(glViewport(0, 0, winWidth, winHeight));
         GLCall(glEnable(GL_BLEND));
@@ -866,7 +877,7 @@ int App::launch() {
         square.use();
         square.setUniformi("u_texture", 0);
         GLCall(glActiveTexture(GL_TEXTURE0 + 0));
-        // GLCall(glBindVertexArray(vao));
+        GLCall(glBindVertexArray(vao));
         GLCall(glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer));
         GLCall(glEnableVertexAttribArray(square.attribute("position")));
         GLCall(glEnableVertexAttribArray(square.attribute("texcoord")));

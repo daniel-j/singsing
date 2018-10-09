@@ -22,8 +22,8 @@ export CC="clang"
 export CXX="clang++"
 export BUILD_TYPE=Debug
 
-$LINUX && export CC="$CC"
-$LINUX && export CXX="$CXX -static-libgcc -static-libstdc++"
+# $LINUX && export CC="$CC"
+# $LINUX && export CXX="$CXX -static-libgcc -static-libstdc++"
 
 # $LINUX && [ "$CROSSWIN" == "false" ] && CC="$CC -U_FORTIFY_SOURCE -fno-stack-protector -include $PREFIX/libcwrap.h"
 # $LINUX && [ "$CROSSWIN" == "false" ] && CXX="$CXX -U_FORTIFY_SOURCE -fno-stack-protector -D_GLIBCXX_USE_CXX11_ABI=0 -include $PREFIX/libcwrap.h"
@@ -225,7 +225,8 @@ build_projectm() {
 	echo "==> Building projectM"
 	tput sgr0
 	cd "$SRC/projectm"
-	./configure --prefix="$PREFIX" --host="$HOST" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
+	autoreconf
+	./configure --prefix="$PREFIX" --host="$HOST" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" CXXFLAGS="$CXXFLAGS" \
 		--disable-rpath --disable-qt --disable-sdl --disable-emscripten --disable-gles
 	make $makearg
 	make install

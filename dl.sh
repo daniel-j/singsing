@@ -32,7 +32,7 @@ for i in "${deps[@]}"; do
 		continue
 	fi
 	rm -rf "deps/$name"
-	echo "Downloading $url"
+	echo "Downloading $name from $url"
 	filename="${url%/download}"
 	case "$filename" in
 	*.zip)
