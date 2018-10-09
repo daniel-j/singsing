@@ -4,4 +4,6 @@ singsing
 Dependencies
 ------------
 
-Ubuntu: `apt install libglm-dev libsoundio-dev libaubio-dev libglew-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-dev`
+Ubuntu: `apt install yasm ffmpeg libglm-dev libsoundio-dev libglew-dev libsdl2-dev`
+
+Arch: `yasm ffmpeg libglm libsoundio glew sdl2`
