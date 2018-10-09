@@ -150,19 +150,6 @@ build_aubio() {
 		build install distclean --testcmd='echo %s'
 }
 
-# yasm shouldn't be cross-compiled
-build_yasm() {
-	$CROSSWIN && return
-	tput setaf 10 && tput bold
-	echo "==> Building Yasm"
-	tput sgr0
-	cd "$SRC/yasm"
-	CC="" CXX="" ./configure --prefix="$PREFIX"
-	make $makearg
-	make install
-	make distclean
-}
-
 build_ffmpeg() {
 	tput setaf 10 && tput bold
 	echo "==> Building FFmpeg"
@@ -268,8 +255,7 @@ if [ "$1" == "all" ]; then
 	build_soundio
 	build_aubio
 
-	# build_yasm
-	build_ffmpeg
+	build_ffmpeg # requires yasm
 
 	build_mpv
 
