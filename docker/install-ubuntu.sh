@@ -17,8 +17,6 @@ packages=(
 	yasm
 	# mpv
 	libdrm-dev librubberband-dev libva-dev
-	# projectm
-	libglm-dev
 )
 
 sudo apt-get install -y "${packages[@]}"

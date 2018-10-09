@@ -6,11 +6,12 @@
 #include "app.hpp"
 #include <iostream>
 #include <algorithm>    // std::min
+#include <cmath>        // std::isnan
 #include <chrono>
 #ifdef __MINGW32__
     #include "lib/mingw.thread.hpp"
 #else
-    #include <thread>       // std::this_thread::sleep_for
+    #include <thread>   // std::this_thread::sleep_for
 #endif
 
 #include <soundio/soundio.h>
@@ -20,7 +21,6 @@
 #include "util/glutils.hpp"
 #include "util/glprogram.hpp"
 #include "util/glframebuffer.hpp"
-#include "projectmrenderer.hpp"
 #include "mpv.hpp"
 #include "song.hpp"
 #include "font.hpp"
@@ -51,7 +51,6 @@ static struct SoundIoOutStream *outstream = nullptr;
 static SDL_AudioDeviceID out_device_sdl = 0;
 static MPV* mpv = nullptr;
 static std::vector<float> mpv_audio_buffer;
-static ProjectMRenderer* projectm = nullptr;
 
 static std::string tones[]{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -195,8 +194,6 @@ void checkRingbuffer(App* app, int bytes_per_frame) {
 
     float *read_ptr = (float*)soundio_ring_buffer_read_ptr(ring_buffer);
 
-    // projectm->processAudio(read_ptr, ANALYSIS_HOP_SIZE);
-
     app->analyzeAudio(0, read_ptr, &pitch1, &probability1);
     app->analyzeAudio(1, read_ptr, &pitch2, &probability2);
 
@@ -303,7 +300,7 @@ static void write_audio_callback(void* userdata, Uint8* stream, int len) {
 
     float volume = 0.0;
     const float* buf = (float*)stream;
-    for (int i = 0; i < len / 4; ++i) {
+    for (int i = 0; i < len / sizeof(float); i+=2) {
         if (abs(buf[i]) > volume) {
             volume = abs(buf[i]);
         }
@@ -316,19 +313,17 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
     const struct SoundIoChannelLayout *layout = &outstream->layout;
 
     int frames_left = frame_count_max;
-    int chunk_size = 2048;
+    int chunk_size = 1024;
     float chunk_buffer[chunk_size * 2];
 
     while (frames_left > 0) {
-        int frame_count = fmin(chunk_size, frames_left);
+        int frame_count = fmax(frame_count_min, fmin(chunk_size, frames_left));
         if ((err = soundio_outstream_begin_write(outstream, &areas, &frame_count))) {
-            fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
+            fprintf(stderr, "unrecoverable begin_write stream error: %s %d\n", soundio_strerror(err), frame_count);
             exit(1);
         }
 
-        // std::cout << frame_count << std::endl;
-
-        write_audio_callback(NULL, (Uint8*)&chunk_buffer, frame_count * 4 * 2);
+        write_audio_callback(NULL, (Uint8*)&chunk_buffer, frame_count * sizeof(float) * layout->channel_count);
 
         for (int frame = 0; frame < frame_count; frame += 1) {
             for (int channel = 0; channel < layout->channel_count; channel += 1) {
@@ -343,7 +338,7 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
             if (err == SoundIoErrorUnderflow) {
                 return;
             }
-            fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
+            fprintf(stderr, "unrecoverable end_write stream error: %s\n", soundio_strerror(err));
             exit(1);
         }
         frames_left -= frame_count;
@@ -496,7 +491,7 @@ void App::initAudio() {
         return;
     }
 
-    if(!soundio_device_supports_sample_rate(out_device_sio, 44800)) {
+    if(!soundio_device_supports_sample_rate(out_device_sio, 48000)) {
         std::cerr << "Sample rate not supported" << std::endl;
         return;
     }
@@ -636,17 +631,13 @@ App::App() {
 
 }
 App::~App() {
-    if (projectm) delete projectm;
     if (instream) soundio_instream_pause(instream, true);
     if (outstream) soundio_outstream_pause(outstream, true);
     if (out_device_sdl) {
         SDL_ClearQueuedAudio(out_device_sdl);
         SDL_CloseAudioDevice(out_device_sdl);
     }
-    if (mpv) {
-        delete mpv;
-        mpv = nullptr;
-    }
+    if (mpv) delete mpv;
     if (glctx) SDL_GL_DeleteContext(glctx);
     if (renderer) SDL_DestroyRenderer(renderer);
     if (mainWindow) SDL_DestroyWindow(mainWindow);
@@ -743,10 +734,6 @@ int App::init() {
     GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
     SDL_PumpEvents();
-
-    // projectm = new ProjectMRenderer("./projectm.conf", 0);
-    // projectm->init();
-
     return 0;
 }
 
@@ -866,9 +853,6 @@ int App::launch() {
         GLCall(mpv->render(winWidth, winHeight, mpv_fbo.getHandle(), 0));
         GLCall(glEnable(GL_CULL_FACE));
 
-        // projectm->resize(winWidth, winHeight);
-        // projectm->renderFrame();
-
         // restore state
         GLCall(glViewport(0, 0, winWidth, winHeight));
         GLCall(glEnable(GL_BLEND));
@@ -911,7 +895,7 @@ int App::launch() {
         GLCall(glBindTexture(GL_TEXTURE_2D, fpsTexture));
         square.setUniform("viewSize", textureSize.w, textureSize.h);
         square.setUniform("bgColor", 0.0, 0.0, 0.0, 0.3);
-        GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
+        // GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
 
         square.setUniform("textureOpacity", 0.0);
 

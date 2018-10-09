@@ -209,18 +209,6 @@ build_mpv() {
 	# --disable-cplayer
 }
 
-build_projectm() {
-	tput setaf 10 && tput bold
-	echo "==> Building projectM"
-	tput sgr0
-	cd "$SRC/projectm"
-	./configure --prefix="$PREFIX" --host="$HOST" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" CXXFLAGS="$CXXFLAGS" \
-		--disable-rpath --disable-qt --disable-sdl --disable-emscripten --disable-gles
-	make $makearg
-	make install
-	make clean
-}
-
 build_singsing() {
 	tput setaf 10 && tput bold
 	echo "==> Building singsing"
@@ -258,8 +246,6 @@ if [ "$1" == "all" ]; then
 	build_ffmpeg # requires yasm
 
 	build_mpv
-
-	build_projectm
 
 	touch "$PREFIX/built_libs"
 
