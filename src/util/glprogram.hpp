@@ -23,7 +23,7 @@ class Program {
         GLCall(glDeleteProgram(shaderProgram));
     }
 
-    bool load(const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
+    bool load(const std::string &vertexShaderPath, const std::string &fragmentShaderPath, const std::string &geometryShaderPath = "") {
         // Generate our shader. This is similar to glGenBuffers() and glGenVertexArray()
         // except that this returns the ID
         shaderProgram = glCreateProgram();
@@ -33,6 +33,10 @@ class Program {
         }
 
         if (!LoadShader(fragmentShaderPath, GL_FRAGMENT_SHADER)) {
+            return false;
+        }
+
+        if (!geometryShaderPath.empty() && !LoadShader(geometryShaderPath, GL_GEOMETRY_SHADER)) {
             return false;
         }
 

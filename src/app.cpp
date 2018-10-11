@@ -300,16 +300,15 @@ static void write_audio_callback(void*, Uint8* stream, int len) {
     // std::cout << len << " " << frames_written << std::endl;
     // std::cout << SDL_GetQueuedAudioSize(out_device_sdl) << std::endl;
 
+    mviz.write_audio_samples((float*)stream, 2);
+
     float volume = 0.0;
     const float* buf = (float*)stream;
-    float monoBuffer[2048]{0};
     for (size_t i = 0; i < len / sizeof(float); i++) {
         if (abs(buf[i]) > volume) {
             volume = abs(buf[i]);
         }
-        monoBuffer[i / 2] += buf[i] / 2.0;
     }
-    mviz.do_fft(monoBuffer);
 }
 
 static void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max) {
@@ -792,6 +791,8 @@ int App::launch() {
         "deps/cold-song.mp3"
     );
 
+    mviz.init();
+
     SDL_Color textColor{255, 255, 255, 255};
     GLuint fpsTexture;
     GLCall(glGenTextures(1, &fpsTexture));
@@ -851,6 +852,8 @@ int App::launch() {
         GLCall(glViewport(0, 0, winWidth, winHeight));
         GLCall(glClearColor(0.0, 0.0, 0.0, 0.0));
         GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+
+        mviz.update_textures();
 
         // render mpv video frame to framebuffer
         mpv_fbo.resize(winWidth, winHeight);
