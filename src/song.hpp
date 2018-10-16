@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 struct SongMetadata {
 	std::string encoding;
@@ -19,6 +20,24 @@ struct SongMetadata {
 	std::string updated;
 	float bpm = 0;
 	long gap = 0;
+	bool relative = false;
+	float previewStart = 0;
+};
+
+enum SongNoteType {
+	SongNoteTypeNormal,
+	SongNoteTypeGolden,
+	SongNoteTypeFreestyle,
+	SongNoteTypeRap,
+	SongNoteTypeRapGolden
+};
+
+struct SongNote {
+	SongNoteType type;
+	int tone;
+	int beat;
+	int duration;
+	std::string lyric;
 };
 
 class Song {
@@ -39,7 +58,14 @@ public:
 	const float timeToBeat(float time) const {
 		return metadata.bpm * (time - metadata.gap / 1000.0) / 60.0;
 	}
+	const float beatToTime(float beat) const {
+		return metadata.gap / 1000.0 + beat * 60.0 / metadata.bpm;
+	}
 private:
 	// metadata
 	SongMetadata metadata;
+	std::vector<SongNote> notes;
+	std::vector<int> sentenceBreaks;
+	bool hasRap = false;
+	bool isDuet = false;
 };
