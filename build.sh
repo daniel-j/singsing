@@ -76,9 +76,21 @@ build_glew() {
 	fi
 }
 
+build_freetype() {
+	tput setaf 10 && tput bold
+	echo "==> Building FreeType"
+	tput sgr0
+	cd "$SRC/freetype"
+	./configure --prefix="$PREFIX" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" \
+		--disable-static --with-harfbuzz=no --with-png=no --with-bzip2=no
+	make $makearg
+	make install
+	make distclean
+}
+
 build_ftgl() {
 	tput setaf 10 && tput bold
-	echo "==> Building Freetype-GL"
+	echo "==> Building FreeType-GL"
 	tput sgr0
 	cd "$SRC/ftgl"
 	mkdir -p build
@@ -88,6 +100,7 @@ build_ftgl() {
 		-Dfreetype-gl_BUILD_APIDOC=OFF \
 		-Dfreetype-gl_BUILD_DEMOS=OFF \
 		-Dfreetype-gl_BUILD_TESTS=OFF \
+		-Dfreetype-gl_USE_VAO=ON \
 		-DCMAKE_BUILD_TYPE=MinSizeRel
 	make $makearg
 	make install
@@ -235,8 +248,8 @@ if [ "$1" == "all" ]; then
 
 	build_glew
 
-	# build_freetype
-	# build_ftgl
+	build_freetype
+	build_ftgl
 
 	build_sdl2
 
