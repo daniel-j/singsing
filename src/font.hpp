@@ -26,7 +26,7 @@ public:
 	Font(const std::string& name, const std::string& filename, float size) {
 		m_name = name;
 
-		m_texatlas = ftgl::texture_atlas_new(1024, 1024, 1);
+		m_texatlas = ftgl::texture_atlas_new(512, 512, 1);
 		m_texfont = ftgl::texture_font_new_from_file(m_texatlas, size, filename.c_str());
 		if (!m_texfont) {
 			std::cerr << "Font file " << filename << " not found" << std::endl;
@@ -75,6 +75,7 @@ public:
 		float b = color.b / 255;
 		float a = color.a / 255;
 		size_t i;
+
 	    for( i = 0; i < strlen(ctext); ++i ) {
 	        ftgl::texture_glyph_t *glyph = ftgl::texture_font_get_glyph( m_texfont, ctext + i );
 	        if ( glyph != NULL ) {
