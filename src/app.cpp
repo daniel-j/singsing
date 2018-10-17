@@ -574,14 +574,12 @@ void App::initAudio() {
     }
 
     aubioPitchChannels = (aubio_pitch_t **)malloc(sizeof(aubio_pitch_t *) * instream->layout.channel_count);
-    // yinChannels = new Yin[instream->layout.channel_count];
     for (int channel = 0; channel < instream->layout.channel_count; ++channel) {
         aubioPitchChannels[channel] = new_aubio_pitch((char*)"yinfast", ANALYSIS_BUFFER_LENGTH, ANALYSIS_HOP_SIZE, instream->sample_rate);
         if (!aubioPitchChannels[channel]) {
             std::cerr << "Aubio algorithm not found, falling back to yin" << std::endl;
             aubioPitchChannels[channel] = new_aubio_pitch((char*)"yin", ANALYSIS_BUFFER_LENGTH, ANALYSIS_HOP_SIZE, instream->sample_rate);
         }
-        // yinChannels[channel].initialize(instream->sample_rate, ANALYSIS_BUFFER_LENGTH, 1.0);
     }
 
     if ((err = soundio_instream_start(instream))) {
@@ -654,7 +652,6 @@ App::~App() {
     if (outstream) soundio_outstream_destroy(outstream);
     if (out_device_sio) soundio_device_unref(out_device_sio);
     if (soundio) soundio_destroy(soundio);
-    // if (yinChannels) delete[] yinChannels;
     if (aubioPitchChannels) {
         del_aubio_pitch(aubioPitchChannels[0]);
         del_aubio_pitch(aubioPitchChannels[1]);

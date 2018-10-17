@@ -40,7 +40,7 @@ find_package(SDL2 REQUIRED)
 # find_package(FreetypeGL REQUIRED)
 find_package(SoundIO REQUIRED)
 find_package(Aubio REQUIRED)
-find_package(FFmpeg REQUIRED COMPONENTS AVCODEC AVFORMAT AVUTIL AVFILTER AVDEVICE SWRESAMPLE SWSCALE)
+# find_package(FFmpeg REQUIRED COMPONENTS AVCODEC AVFORMAT AVUTIL AVFILTER AVDEVICE SWRESAMPLE SWSCALE)
 find_package(MPV REQUIRED)
 
 target_link_libraries(
@@ -54,7 +54,7 @@ target_link_libraries(
     # ${FREETYPEGL_LIBRARY}
     ${SOUNDIO_LIBRARY}
     ${AUBIO_LIBRARY}
-    ${FFMPEG_LIBRARY}
+    #${FFMPEG_LIBRARY}
     ${MPV_LIBRARY}
 )
 
