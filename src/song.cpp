@@ -79,7 +79,9 @@ const int Song::parse(const std::string &path) {
             } else if (identifier == "BPM") {
                 metadata.bpm = std::stof(value);
             } else if (identifier == "GAP") {
-                metadata.gap = std::stol(value);
+                metadata.gap = std::stol(value) / 1000.0;
+            } else if (identifier == "VIDEOGAP") {
+                metadata.videoGap = std::stod(value);
             } else if (identifier == "RELATIVE") {
                 metadata.relative = value == "YES";
             } else if (identifier == "PREVIEWSTART") {

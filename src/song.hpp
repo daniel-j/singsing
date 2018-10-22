@@ -19,7 +19,8 @@ struct SongMetadata {
 	std::string comment;
 	std::string updated;
 	float bpm = 0;
-	long gap = 0;
+	double gap = 0;
+	double videoGap = 0;
 	bool relative = false;
 	float previewStart = 0;
 };
@@ -52,14 +53,15 @@ public:
 	const std::string getAudioFile() const { return metadata.audioFile; }
 	const std::string getVideoFile() const { return metadata.videoFile; }
 	const float getBPM() const { return metadata.bpm; }
-	const long getGap() const { return metadata.gap; }
+	const double getGap() const { return metadata.gap; }
+	const double getVideoGap() const { return metadata.videoGap; }
 
 	// methods
 	const float timeToBeat(float time) const {
-		return metadata.bpm * (time - metadata.gap / 1000.0) / 60.0;
+		return metadata.bpm * (time - metadata.gap) / 60.0;
 	}
 	const float beatToTime(float beat) const {
-		return metadata.gap / 1000.0 + beat * 60.0 / metadata.bpm;
+		return metadata.gap + beat * 60.0 / metadata.bpm;
 	}
 private:
 	// metadata

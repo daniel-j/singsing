@@ -141,6 +141,20 @@ void MPV::processSDLEvent(SDL_Event* event) const {
     }
 }
 
+int MPV::setProperty(const char* name, double value) const {
+    return mpv_set_property(mpv, name, MPV_FORMAT_DOUBLE, &value);
+}
+int MPV::setProperty(const char* name, const char* value) const {
+    return mpv_set_property(mpv, name, MPV_FORMAT_STRING, &value);
+}
+
+int MPV::setOption(const char* name, double value) const {
+    return mpv_set_option(mpv, name, MPV_FORMAT_DOUBLE, &value);
+}
+int MPV::setOption(const char* name, const char* value) const {
+    return mpv_set_option_string(mpv, name, value);
+}
+
 void MPV::play(std::string videoFile, std::string audioFile) const {
     // Play this file. Note that this starts playback asynchronously.
     const char *command[]{"loadfile", videoFile.c_str(), NULL};

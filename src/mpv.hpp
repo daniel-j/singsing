@@ -14,6 +14,10 @@ public:
     ~MPV();
     int init(bool useLibmpvAudio = false);
     void processSDLEvent(SDL_Event* event) const;
+    int setProperty(const char* name, double value) const;
+    int setProperty(const char* name, const char* value) const;
+    int setOption(const char* name, double value) const;
+    int setOption(const char* name, const char* value) const;
     void play(std::string videoFile = "https://www.youtube.com/watch?v=JqrQ6lSOYxI", std::string audioFile = "") const;
     void render(int width, int height, int fbo = 0, int format = 0, bool skip_rendering = false) const;
     void reportSwap() const;

@@ -179,6 +179,7 @@ int recordCallback(const void *inputBuffer, void *outputBuffer,
     return paContinue;
 }
 */
+
 void App::analyzeAudio(const int& channel, const float* const buffer, float* const pitch, float* const probability) {
     float channelBuffer[ANALYSIS_HOP_SIZE];
     for (int i = 0; i < ANALYSIS_HOP_SIZE; ++i) {
@@ -716,9 +717,15 @@ int App::init() {
 
 int App::launch() {
 
+    mpv = new MPV;
+
+    mpv->init(out_device_sdl || outstream);
+
     Song song;
     song.parse("deps/cold-notes.txt");
     std::cout << "Parsed song: " << song.getTitle() << " by " << song.getArtist() << std::endl;
+
+    mpv->setProperty("audio-delay", -song.getVideoGap());
 
     auto fontFile = "/usr/share/fonts/TTF/DejaVuSans.ttf";
     if (access(fontFile, F_OK) == -1) {
@@ -748,10 +755,6 @@ int App::launch() {
     };
 
     Framebuffer mpv_fbo;
-
-    mpv = new MPV;
-
-    mpv->init(out_device_sdl || outstream);
 
     mpv->play(
         "deps/cold-video.mp4",
