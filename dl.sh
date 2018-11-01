@@ -6,7 +6,7 @@ set -e
 
 declare -a deps
 deps+=('glew|https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0.tgz/download')
-deps+=('sdl2|https://www.libsdl.org/release/SDL2-2.0.8.tar.gz')
+deps+=('sdl2|https://www.libsdl.org/release/SDL2-2.0.9.tar.gz')
 # deps+=('sdl2_image|https://www.libsdl.org/projects/SDL_image/release/SDL2_image-2.0.3.tar.gz')
 deps+=('soundio|https://github.com/andrewrk/libsoundio/archive/7c53dabc6e21d08c68ce6764f3108f6349ced308.tar.gz')
 deps+=('ffmpeg|https://www.ffmpeg.org/releases/ffmpeg-4.0.2.tar.xz')

@@ -124,7 +124,7 @@ build_sdl2() {
 		--disable-nas --disable-esd --disable-arts --disable-diskaudio \
 		--enable-video-wayland --enable-wayland-shared --enable-x11-shared \
 		--enable-ibus --enable-fcitx --enable-ime \
-		--disable-rpath --disable-vulkan
+		--disable-rpath --disable-vulkan --disable-render
 	make $makearg
 	make install
 	make distclean
