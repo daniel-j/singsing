@@ -675,7 +675,7 @@ int App::init() {
     mainWindow = SDL_CreateWindow("singsing",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         640, 360,
-        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIDDEN/*|SDL_WINDOW_ALLOW_HIGHDPI*/);
+        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE/*|SDL_WINDOW_ALLOW_HIGHDPI*/);
     if (!mainWindow) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -710,8 +710,6 @@ int App::init() {
     SDL_GL_SwapWindow(mainWindow);
     GLCall(glClearColor(0.0, 0.0, 0.0, 0.0));
     GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-
-    SDL_PumpEvents();
     return 0;
 }
 
@@ -936,13 +934,6 @@ int App::launch() {
             std::chrono::duration<double, std::milli> sleep_time = b - a;
         }
 
-        if (firstFrame) {
-            // Fix for macOS Mojave. Show window after
-            // SDL2 has processed events once. Otherwise
-            // shows black window until moved.
-            SDL_ShowWindow(mainWindow);
-            SDL_RaiseWindow(mainWindow);
-        }
         firstFrame = false;
     }
 

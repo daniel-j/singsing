@@ -40,8 +40,6 @@ $MACOS && makearg="-j$(sysctl -n hw.ncpu)" || makearg="-j$(nproc)"
 
 mkdir -pv $PREFIX/{bin,include,lib,share}
 
-$LINUX && [ "$CROSSWIN" == "false" ] && cp -f "$SRC/libcwrap.h" "$PREFIX/libcwrap.h"
-
 clean_prefix() {
 	tput setaf 10 && tput bold
 	echo "==> Cleaning prefix"
@@ -142,8 +140,8 @@ build_soundio() {
 	cd build
 	rm -f CMakeCache.txt
 	cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
-		-DCMAKE_MACOSX_RPATH=0 -DBUILD_STATIC_LIBS=NO \
-		-DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_TESTS=NO # tests require gcov
+		-DBUILD_STATIC_LIBS=NO -DCMAKE_BUILD_TYPE=MinSizeRel \
+		-DBUILD_TESTS=NO # tests require gcov
 	make $makearg
 	make install
 	make clean
