@@ -5,15 +5,15 @@ set -e
 . ./env.sh
 
 declare -a deps
-deps+=('glew|https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0.tgz/download')
+# deps+=('glew|https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0.tgz/download')
 deps+=('sdl2|https://www.libsdl.org/release/SDL2-2.0.9.tar.gz')
 # deps+=('sdl2_image|https://www.libsdl.org/projects/SDL_image/release/SDL2_image-2.0.3.tar.gz')
 deps+=('soundio|https://github.com/andrewrk/libsoundio/archive/2.0.0.tar.gz')
-deps+=('ffmpeg|https://www.ffmpeg.org/releases/ffmpeg-4.1.1.tar.xz')
+deps+=('ffmpeg|https://www.ffmpeg.org/releases/ffmpeg-4.1.3.tar.xz')
 deps+=('mpv|https://github.com/daniel-j/mpv/archive/ao_cb.tar.gz')
 deps+=('aubio|https://aubio.org/pub/aubio-0.4.7.tar.bz2')
-deps+=('freetype|https://download.savannah.gnu.org/releases/freetype/freetype-2.9.1.tar.bz2')
-deps+=('ftgl|https://github.com/rougier/freetype-gl/archive/7a290ac372d2bd94137a9fed6b2f5a6ac4360ec2.tar.gz')
+deps+=('freetype|https://sourceforge.net/projects/freetype/files/freetype2/2.10.0/freetype-2.10.0.tar.bz2')
+# deps+=('ftgl|https://github.com/rougier/freetype-gl/archive/7a290ac372d2bd94137a9fed6b2f5a6ac4360ec2.tar.gz')
 deps+=('cold-video.mp4|https://djazz.se/lab/usdx-player/songs/Synthis,%204EverfreeBrony,%20FritzyBeat%20-%20Cold/video.mp4')
 deps+=('cold-song.mp3|https://djazz.se/lab/usdx-player/songs/Synthis,%204EverfreeBrony,%20FritzyBeat%20-%20Cold/song.mp3')
 deps+=('cold-notes.txt|https://djazz.se/lab/usdx-player/songs/Synthis,%204EverfreeBrony,%20FritzyBeat%20-%20Cold/notes.txt')

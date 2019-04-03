@@ -1,6 +1,6 @@
 #pragma once
 
-#include <GL/glew.h>
+#include <glad/glad.h>
 
 #include <string>
 #include <vector>
@@ -23,7 +23,7 @@ class Program {
         GLCall(glDeleteProgram(shaderProgram));
     }
 
-    bool load(const std::string &vertexShaderPath, const std::string &fragmentShaderPath, const std::string &geometryShaderPath = "") {
+    bool load(const std::string &vertexShaderPath, const std::string &fragmentShaderPath/*, const std::string &geometryShaderPath = ""*/) {
         // Generate our shader. This is similar to glGenBuffers() and glGenVertexArray()
         // except that this returns the ID
         shaderProgram = glCreateProgram();
@@ -36,9 +36,11 @@ class Program {
             return false;
         }
 
+        /*
         if (!geometryShaderPath.empty() && !LoadShader(geometryShaderPath, GL_GEOMETRY_SHADER)) {
             return false;
         }
+        */
 
         // All shaders has been created, now we must put them together into one large object
         auto res = LinkShaders();

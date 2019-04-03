@@ -99,6 +99,7 @@ build_ftgl() {
 		-Dfreetype-gl_BUILD_DEMOS=OFF \
 		-Dfreetype-gl_BUILD_TESTS=OFF \
 		-Dfreetype-gl_USE_VAO=ON \
+		-DOpenGL_GL_PREFERENCE=GLVND \
 		-DCMAKE_BUILD_TYPE=MinSizeRel
 	make $makearg
 	make install
@@ -244,10 +245,10 @@ if [ "$1" == "all" ]; then
 
 	clean_prefix
 
-	build_glew
+	# build_glew
 
 	build_freetype
-	build_ftgl
+	# build_ftgl
 
 	build_sdl2
 

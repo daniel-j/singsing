@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <GL/glew.h>
+#include <glad/glad.h>
 #include "util/glutils.hpp"
 #include "util/glprogram.hpp"
 #include <aubio/aubio.h>

@@ -1,7 +1,6 @@
 
 // this needs to be first
-#define GL3_PROTOTYPES 1
-#include <GL/glew.h>
+#include <glad/glad.h>
 
 #include "app.hpp"
 #include <iostream>
@@ -688,10 +687,8 @@ int App::init() {
     }
 
     SDL_GL_SetSwapInterval(1);
-
-    glewExperimental = GL_TRUE;
-    if (GLenum err = glewInit() != GLEW_OK) {
-        std::cerr << "GLEW Error: " << glewGetErrorString(err) << std::endl;
+    if (!gladLoadGL()) {
+        std::cerr << "GLAD Error!" << std::endl;
         return 1;
     }
 
