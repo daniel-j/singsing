@@ -28,7 +28,7 @@
     #define SDL_AUDIO_OUTPUT 1
 //#endif
 
-const int MAX_FRAMES_PER_SECOND = 60;
+const int MAX_FRAMES_PER_SECOND = 300;
 
 const int ANALYSIS_BUFFER_LENGTH = 2048;
 const int ANALYSIS_HOP_SIZE = ANALYSIS_BUFFER_LENGTH / 4;
