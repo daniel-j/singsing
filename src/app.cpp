@@ -741,7 +741,7 @@ int App::launch() {
     mpv->init(out_device_sdl || outstream);
 
     Song song;
-    song.parse("deps/cold-notes.txt");
+    song.parse("deps/song/4EverfreeBrony - Light and Darkness/notes.txt");
     std::cout << "Parsed song: " << song.getTitle() << " by " << song.getArtist() << std::endl;
 
     mpv->setProperty("audio-delay", -song.getVideoGap());
@@ -783,8 +783,8 @@ int App::launch() {
     Framebuffer mpv_fbo;
 
     mpv->play(
-        "deps/cold-video.mp4",
-        "deps/cold-song.mp3"
+        "deps/song/4EverfreeBrony - Light and Darkness/video.mp4",
+        "deps/song/4EverfreeBrony - Light and Darkness/song.mp3"
     );
 
     mviz.init();
