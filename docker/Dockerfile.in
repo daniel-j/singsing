@@ -1,0 +1,23 @@
+FROM %%from%%
+
+RUN yum upgrade -y --setopt=tsflags=nodocs
+
+RUN yum install -y --setopt=tsflags=nodocs centos-release-scl epel-release
+RUN yum install -y --setopt=tsflags=nodocs devtoolset-7-gcc devtoolset-7-gcc-c++
+
+RUN yum install -y --setopt=tsflags=nodocs \
+    make automake autoconf cmake3 patch which file git unzip yasm \
+    glibc-devel mesa-libGL-devel mesa-libGLES-devel mesa-libEGL-devel alsa-lib-devel pulseaudio-libs-devel jack-audio-connection-kit-devel \
+    libX11-devel libXext-devel libXcursor-devel libXinerama-devel libXrandr-devel libXi-devel libxkbcommon-devel \
+    wayland-devel wayland-protocols-devel \
+    libwebp-devel libjpeg-turbo-devel libtiff-devel \
+    dbus-devel systemd-devel zlib-devel \
+    libdrm-devel rubberband-devel libsamplerate-devel libva-devel
+
+RUN yum clean all -y
+
+RUN ln -sf /usr/bin/cmake3 /usr/local/bin/cmake && \
+	ln -sf /usr/bin/cpack3 /usr/local/bin/cpack && \
+	ln -sf /usr/bin/ctest3 /usr/local/bin/ctest
+
+CMD ["bash"]
