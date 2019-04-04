@@ -1,5 +1,8 @@
 #pragma once
 
+// this needs to be first
+#include <glad/glad.h>
+
 #include <SDL2/SDL.h>
 #include <aubio/aubio.h>
 

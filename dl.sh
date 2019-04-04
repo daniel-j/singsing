@@ -8,6 +8,7 @@ declare -a deps
 # deps+=('glew|https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0.tgz/download')
 deps+=('sdl2|https://www.libsdl.org/release/SDL2-2.0.9.tar.gz')
 # deps+=('sdl2_image|https://www.libsdl.org/projects/SDL_image/release/SDL2_image-2.0.3.tar.gz')
+deps+=('sdl2_ttf|https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.15.tar.gz')
 deps+=('soundio|https://github.com/andrewrk/libsoundio/archive/2.0.0.tar.gz')
 deps+=('ffmpeg|https://www.ffmpeg.org/releases/ffmpeg-4.1.3.tar.xz')
 deps+=('mpv|https://github.com/daniel-j/mpv/archive/ao_cb.tar.gz')

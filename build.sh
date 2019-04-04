@@ -131,6 +131,22 @@ build_sdl2() {
 	# make clean
 }
 
+build_sdl2_ttf() {
+	tput setaf 10 && tput bold
+	echo "==> Building SDL2_ttf"
+	tput sgr0
+	cd "$SRC/sdl2_ttf"
+	bash ./autogen.sh || true
+	# rm -rf build
+	mkdir -p build
+	cd build
+	../configure --prefix="$PREFIX" --host="$HOST" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" CC="$CC" CXX="$CXX" LDFLAGS="$LDFLAGS" CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" \
+		--disable-static --with-sdl-prefix="$PREFIX"
+	make $makearg
+	make install
+	make distclean
+}
+
 build_soundio() {
 	tput setaf 10 && tput bold
 	echo "==> Building SoundIO"
@@ -251,6 +267,7 @@ if [ "$1" == "all" ]; then
 	# build_ftgl
 
 	build_sdl2
+	build_sdl2_ttf
 
 	build_soundio
 	build_aubio

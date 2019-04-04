@@ -1,6 +1,4 @@
 
-// this needs to be first
-#include <glad/glad.h>
 
 #include "app.hpp"
 #include <iostream>
@@ -16,7 +14,7 @@
 
 #include <soundio/soundio.h>
 //#include <SDL2/SDL_image.h>
-//#include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_ttf.h>
 #include "util/fpscounter.hpp"
 #include "util/glutils.hpp"
 #include "util/glprogram.hpp"
@@ -592,6 +590,27 @@ void App::initAudio() {
 
 }
 
+SDL_Rect TextToTexture( GLuint tex, TTF_Font* font, SDL_Color color, const std::string &text, int maxwidth = -1 ) {
+    SDL_Surface* s1;
+    if (maxwidth < 0) s1 = TTF_RenderUTF8_Blended(font, text.c_str(), color);
+    else s1 = TTF_RenderUTF8_Blended_Wrapped(font, text.c_str(), color, maxwidth);
+    auto s2 = SDL_ConvertSurfaceFormat(s1, SDL_PIXELFORMAT_RGBA32, 0);
+
+    glBindTexture( GL_TEXTURE_2D, tex );
+    // disable mipmapping on the new texture
+    glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+    glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, s2->w, s2->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, s2->pixels );
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    SDL_Rect rect{0, 0, s2->w, s2->h};
+    SDL_FreeSurface(s1);
+    SDL_FreeSurface(s2);
+    return rect;
+}
+
 /*
 void ImageToTexture( GLuint tex, const char* imgpath ) {
     SDL_Surface* s1 = IMG_Load( imgpath );
@@ -658,6 +677,11 @@ int App::init() {
 
     std::cout << "SDL video driver: " << SDL_GetCurrentVideoDriver() << std::endl;
     std::cout << "SDL audio driver: " << SDL_GetCurrentAudioDriver() << std::endl;
+
+    if (TTF_Init() == -1) {
+        std::cerr << "SDL_ttf could not initialize! " << TTF_GetError() << std::endl;
+        return 1;
+    }
 
     initAudio();
 
@@ -736,7 +760,14 @@ int App::launch() {
         std::cerr << "No font found!" << std::endl;
         return 1;
     }
-    Font myFont("sans-serif", fontFile, 20);
+    auto myFont = TTF_OpenFont(fontFile, 20);
+
+    if (!myFont) {
+        std::cerr << "Font loading error: " << TTF_GetError() << std::endl;
+        return 1;
+    }
+
+    std::cout << "Using font " << fontFile << std::endl;
 
     GLfloat g_vertex_buffer_data[]{
         // vertices    // uv
@@ -809,15 +840,16 @@ int App::launch() {
               note = tones[(int)(currentNote1) % 12];
             }
             last_time = now_time;
-            myFont.clear_text();
-            myFont.add_text(std::string("FPS: ") + std::to_string((int)round(framespersecond)), textColor, 4, 20);
+            //myFont.clear_text();
+            //myFont.add_text(std::string("FPS: ") + std::to_string((int)round(framespersecond)), textColor, 4, 20);
+            textureSize = TextToTexture(fpsTexture, myFont, textColor, (std::string("FPS: ") + std::to_string((int)framespersecond)).c_str());
         }
 
         // clean state
         GLCall(glViewport(0, 0, winWidth, winHeight));
         GLCall(glClearColor(0.0, 0.0, 0.0, 0.0));
         GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-        myFont.setViewport(winWidth, winHeight);
+        // myFont.setViewport(winWidth, winHeight);
 
         mviz.update_textures();
 
@@ -867,9 +899,10 @@ int App::launch() {
 
         // fps counter
         GLCall(glBindTexture(GL_TEXTURE_2D, fpsTexture));
+        square.setUniform("viewOffset", 5, 5);
         square.setUniform("viewSize", textureSize.w, textureSize.h);
-        square.setUniform("bgColor", 0.0, 0.0, 0.0, 0.3);
-        // GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
+        square.setUniform("bgColor", 0.0, 0.0, 0.0, 0.5);
+        GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
 
         square.setUniform("textureOpacity", 0.0);
 
@@ -907,8 +940,6 @@ int App::launch() {
         GLCall(glDisableVertexAttribArray(square.attribute("position")));
         GLCall(glDisableVertexAttribArray(square.attribute("texcoord")));
 
-        myFont.draw();
-
         // GLCall(glBindVertexArray(0));
         // macOS bug workaround, make sure no framebuffer is active
         GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
@@ -936,6 +967,8 @@ int App::launch() {
 
     GLCall(glDeleteBuffers(1, &vertexbuffer));
     GLCall(glDeleteTextures(1, &fpsTexture));
+
+    TTF_CloseFont(myFont);
 
     return EXIT_SUCCESS;
 }
